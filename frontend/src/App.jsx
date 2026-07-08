@@ -33,8 +33,10 @@ const FONT_MONO = "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monosp
 const FONT_UI = "'Zen Kaku Gothic New', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif";
 
 // ---------- backend (ローカル or デプロイ先) ----------
-// フロントは起動時にこのベースを自動検出する。未検出パネルはサンプル表示+黄タグ (SPEC §6)。
-const API_BASE = "http://localhost:8787";
+// 全ての外部データ取得は自分のbackend 1か所に一本化する (デプロイ時のCSP/CORS対策)。
+// デプロイでは VITE_API_BASE に Render のURL(https://xxx.onrender.com)を設定する。
+// 未設定時はローカル開発用に localhost:8787。未検出パネルはサンプル表示+黄タグ (SPEC §6)。
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8787";
 
 const jget = async (path, ms = 2500) => {
   const ac = new AbortController();
@@ -798,56 +800,12 @@ export default function HybridMacroDeskBTC() {
     }
 
     if (!marketLive) {
-      // バックエンド未検出 or /api/market 失敗 → Hyperliquid を直接取得 (ブラウザ実行時は可)
-      try {
-        const end = Date.now();
-        const start = end - 320 * 3600 * 1000;
-        const ac = new AbortController();
-        const timer = setTimeout(() => ac.abort(), 7000);
-        const [candleRes, ctxRes] = await Promise.all([
-          fetch("https://api.hyperliquid.xyz/info", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            signal: ac.signal,
-            body: JSON.stringify({ type: "candleSnapshot", req: { coin: "BTC", interval: "1h", startTime: start, endTime: end } }),
-          }),
-          fetch("https://api.hyperliquid.xyz/info", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            signal: ac.signal,
-            body: JSON.stringify({ type: "metaAndAssetCtxs" }),
-          }),
-        ]);
-        clearTimeout(timer);
-        const raw = await candleRes.json();
-        const parsed = raw.map((c) => ({ t: c.t, o: +c.o, h: +c.h, l: +c.l, c: +c.c, v: +c.v }));
-        const [meta, ctxs] = await ctxRes.json();
-        const idx = meta.universe.findIndex((u) => u.name === "BTC");
-        const a = ctxs[idx];
-        setCandles(parsed);
-        setCtx({
-          markPx: +a.markPx,
-          prevDayPx: +a.prevDayPx,
-          funding: a.funding,
-          openInterest: a.openInterest,
-          dayNtlVlm: +a.dayNtlVlm,
-        });
-        setDataMode("live");
-        try {
-          const f = await fetch("https://api.alternative.me/fng/?limit=1");
-          const fj = await f.json();
-          setFng({ value: +fj.data[0].value, label: fj.data[0].value_classification });
-        } catch {
-          setFng(null);
-        }
-        marketLive = true;
-      } catch {
-        // 完全オフライン (プレビューのサンドボックス等) → デモデータへフォールバック
-        setCandles(demo.candles);
-        setCtx(demo.ctx);
-        setFng(demo.fng);
-        setDataMode("demo");
-      }
+      // 外部APIはブラウザから直接叩かず backend に一本化する方針のため、
+      // /api/market が使えない (backend未検出/起動直後) 場合はデモへフォールバックする。
+      setCandles(demo.candles);
+      setCtx(demo.ctx);
+      setFng(demo.fng);
+      setDataMode("demo");
     }
 
     // 3) Positioning (deriv): /api/derivs 優先 → サンプル

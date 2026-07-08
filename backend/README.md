@@ -52,6 +52,21 @@ pip install -r requirements-dev.txt
 pytest        # 計算純関数のJSXパリティ + collectors のパース/フォールバック
 ```
 
+### Render デプロイ (本番)
+
+リポジトリ直下の `render.yaml` (Blueprint) で backend を Web Service として定義済み。
+Render ダッシュボードで手入力する環境変数は次の3つ (詳細な手順は `handoff/DEPLOY_STEPS.md`):
+
+| 環境変数 | 用途 | 未設定時 |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | AI Overview / カレンダーAI注釈 | ルールベース文にフォールバック |
+| `FINNHUB_API_KEY` | 経済カレンダーの経済指標 | Deribit満期イベントのみ |
+| `FRONTEND_ORIGIN` | CORS許可元。Vercel の公開URL (例 `https://xxx.vercel.app`。カンマ区切りで複数可) | `*` (全許可・開発用) |
+
+- `COINGLASS_API_KEY` は現方針では不要。
+- ポートは Render が `PORT` を注入し、`startCommand` の `--port $PORT` が受ける。
+- プランは **Starter (常時稼働)** を選ぶこと。無料プランはスリープするため 24h HL巡回に不向き。
+
 ## 3. 仕組みと限界 (正直な注意書き)
 
 - **実データである根拠**: HLはポジションが透明で、各アドレスの `liquidationPx` を

@@ -386,8 +386,13 @@ async def coinglass_get(path: str, params: dict, cache_sec: int = 60) -> dict:
 
 # ---------------- FastAPI ----------------
 app = FastAPI(title="HL Liquidation Map Service")
+
+# CORS: 本番では FRONTEND_ORIGIN (カンマ区切り可) に VercelのURLを設定する。
+# 未設定時は開発用に全許可 ("*") — 従来のローカル挙動を維持する。
+_origins_env = os.getenv("FRONTEND_ORIGIN", "").strip()
+ALLOW_ORIGINS = [o.strip() for o in _origins_env.split(",") if o.strip()] or ["*"]
 app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+    CORSMiddleware, allow_origins=ALLOW_ORIGINS, allow_methods=["*"], allow_headers=["*"]
 )
 
 
@@ -492,3 +497,12 @@ import collectors  # noqa: E402
 for _mod in collectors.ALL:
     _mod.init(http, bucket, store)
     app.include_router(_mod.router)
+
+
+# ---------------- 直接起動 (python liqmap_service.py) ----------------
+# 通常は `uvicorn liqmap_service:app --port 8787` で起動する。
+# Render等はポートを環境変数 PORT で注入するため、直接起動時もそれを尊重する (未設定は8787)。
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8787")))

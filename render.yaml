@@ -1,0 +1,22 @@
+# render.yaml — Render Blueprint (バックエンド Web Service)
+# ダッシュボードで「Blueprint」から本ファイルを読み込むと、backend が下記設定で作成される。
+# 注意: 無料プランはスリープするため使わない。必ず Starter (有料・常時稼働) を選ぶこと。
+services:
+  - type: web
+    name: hybrid-macro-desk-api
+    runtime: python
+    rootDir: backend
+    plan: starter                       # 月$7固定・常時稼働 (24h HL巡回するため必須)
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn liqmap_service:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # Renderダッシュボードで手入力する秘密情報 (sync:false = リポジトリに値を持たない)
+      - key: ANTHROPIC_API_KEY
+        sync: false                     # 未設定なら AI Overview はルールベース文
+      - key: FINNHUB_API_KEY
+        sync: false                     # 未設定なら経済カレンダーは Deribit満期のみ
+      - key: FRONTEND_ORIGIN
+        sync: false                     # Vercel のURL (例 https://xxx.vercel.app)。CORS許可元
+      # COINGLASS_API_KEY は現方針では不要

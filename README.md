@@ -59,6 +59,13 @@ npm run dev        # http://localhost:5173
 Hyperliquid public API / Binance Futures 公開API / Alternative.me Fear&Greed / Finnhub 経済カレンダー /
 Deribit満期の自前計算 / Anthropic API（AI概況・カレンダー注釈、バックエンド経由）。
 
+## デプロイ (Vercel + Render)
+
+- **backend** → Render Web Service (Starter・常時稼働)。設定は直下の `render.yaml`。
+- **frontend** → Vercel。Root Directory を `frontend` に指定し、環境変数 **`VITE_API_BASE`** に
+  Render のバックエンドURL（例 `https://xxx.onrender.com`）を設定する。フロントはこの1か所だけを見る。
+- 非エンジニア向けのクリック手順: [`handoff/DEPLOY_STEPS.md`](handoff/DEPLOY_STEPS.md)（設計方針は [`handoff/DEPLOY.md`](handoff/DEPLOY.md)）。
+
 ## 免責
 
 本画面は環境認識ツールであり、投資助言ではありません。判断と執行は常にトレーダー自身が行ってください。
