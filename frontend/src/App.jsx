@@ -497,7 +497,8 @@ const EdgeRing = ({ value, color }) => {
   const circ = 2 * Math.PI * r;
   const dash = (value / 100) * circ;
   return (
-    <svg width="84" height="84">
+    // viewBox + flex-shrink無効化で、狭いパネルでもリングが潰れて数字が切れないようにする
+    <svg width="84" height="84" viewBox="0 0 84 84" style={{ flexShrink: 0 }}>
       <circle cx={cx} cy={cy} r={r} fill="none" stroke={C.border} strokeWidth="7" />
       <circle
         cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth="7"
