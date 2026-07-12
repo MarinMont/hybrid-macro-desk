@@ -1159,6 +1159,78 @@ export default function HybridMacroDeskBTC() {
                     降格条件: {entry.regimeNote}
                   </div>
                 </Panel>
+
+                {/* セットアップ — 方向性ベースの機械式目安 (ユーザー承認のもと SPEC§0 を上書きして追加) */}
+                {(() => {
+                  const dir = entry.direction; // LONG | SHORT | null
+                  const long = dir === "LONG";
+                  const short = dir === "SHORT";
+                  if (!long && !short) {
+                    return (
+                      <div className="lg:col-span-3">
+                        <Panel title="セットアップ — 方向性ベースの目安 (EMA20 × ATR × R)" accent>
+                          <div className="text-sm" style={{ color: C.muted }}>
+                            方向未確定 ({dir ?? "—"}) — Entry Engine が LONG / SHORT を示すと、その方向に沿った
+                            エントリー・損切り・利確の目安を表示します。
+                          </div>
+                        </Panel>
+                      </div>
+                    );
+                  }
+                  const sign = long ? 1 : -1;
+                  const dirColor = long ? C.green : C.red;
+                  const atr = m.atr;
+                  const R = 1.5 * atr;                 // 損切り幅 = 1.5×ATR(14)
+                  const entryPx = m.e20;               // 押し目/戻りの基準 = EMA20
+                  const stop = entryPx - sign * R;
+                  const t1 = entryPx + sign * R;       // 1R
+                  const t2 = entryPx + sign * 2 * R;   // 2R
+                  const t3 = entryPx + sign * 3 * R;   // 3R
+                  const rPct = (R / m.price) * 100;
+                  const tiles = [
+                    { k: "エントリー目安", sub: "EMA20 押し目/戻り", v: entryPx, c: C.orangeBright },
+                    { k: "損切り", sub: "1.5×ATR", v: stop, c: C.red },
+                    { k: "利確 T1", sub: "1R", v: t1, c: C.green },
+                    { k: "利確 T2", sub: "2R", v: t2, c: C.green },
+                    { k: "利確 T3", sub: "3R", v: t3, c: C.green },
+                  ];
+                  return (
+                    <div className="lg:col-span-3">
+                      <Panel
+                        title="セットアップ — 方向性ベースの目安 (EMA20 × ATR × R)"
+                        accent
+                        right={
+                          <div className="flex items-center gap-2">
+                            <Tag color={dirColor}>{dir}</Tag>
+                            <Tag color={C.orange}>ATR(14) ${Math.round(atr).toLocaleString()}</Tag>
+                          </div>
+                        }
+                      >
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                          {tiles.map((t) => (
+                            <div key={t.k} className="rounded-lg px-3 py-2.5" style={{ background: C.panelSoft, border: `1px solid ${C.borderSoft}` }}>
+                              <div className="text-xs" style={{ color: C.faint, fontFamily: FONT_MONO }}>{t.k}</div>
+                              <div className="text-lg font-bold" style={{ color: t.c, fontFamily: FONT_MONO }}>{fmtPx(t.v)}</div>
+                              <div className="text-xs" style={{ color: C.faint }}>{t.sub}</div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs" style={{ fontFamily: FONT_MONO }}>
+                          <span style={{ color: C.muted }}>リスク幅(1R) <span style={{ color: C.text }}>${Math.round(R).toLocaleString()} ({rPct.toFixed(2)}%)</span></span>
+                          <span style={{ color: C.muted }}>リスク:リワード <span style={{ color: C.green }}>T1 1:1 · T2 1:2 · T3 1:3</span></span>
+                          <span style={{ color: C.muted }}>現在値 <span style={{ color: C.text }}>{fmtPx(m.price)}</span> はエントリー目安の <span style={{ color: m.price >= entryPx ? C.green : C.red }}>{m.price >= entryPx ? "上" : "下"}</span></span>
+                        </div>
+                        <div className="text-xs mt-3 leading-relaxed" style={{ color: C.muted }}>
+                          Entry Engine の方向({dir})に沿った機械式の目安 — EMA20への押し目/戻りをエントリー、1.5×ATRを損切り、
+                          そこからのR倍数を利確に置いた素案。上下の<span style={{ color: C.text }}>清算クラスター</span>を磁石として利確位置を微調整すると精度が上がる。
+                        </div>
+                        <div className="mt-3 rounded-lg px-3 py-2.5 text-xs leading-relaxed" style={{ background: `${C.orange}12`, border: `1px dashed ${C.orangeDim}`, color: C.orangeBright }}>
+                          ⚖ GO but WAIT — これは方向性から導いた目安であって売買助言ではない。建玉サイズ・執行・最終判断は常にトレーダーの拒否権に従う。
+                        </div>
+                      </Panel>
+                    </div>
+                  );
+                })()}
               </>
             );
           })()}
