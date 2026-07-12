@@ -24,4 +24,8 @@ services:
         value: "6000"                   # 追跡アドレス上限。超過分は追加せずメモリ増加を止める
       - key: LIQMAP_LEADERBOARD_N
         value: "1500"                   # 起動時に投入する大口アドレス数 (少ないほど省メモリ)
+      - key: LIQMAP_LEADERBOARD_MAX_MB
+        value: "15"                     # リーダーボード取得のバイト上限。超過回はスキップしOOMを防ぐ
+      # もし上記でもOOMが続くなら、リーダーボードを完全無効化 (Smart Money/大口初期投入を諦める):
+      #   LIQMAP_DISABLE_LEADERBOARD = 1
       # COINGLASS_API_KEY は現方針では不要

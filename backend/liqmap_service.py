@@ -66,7 +66,12 @@ TIER_INTERVALS = {"WHALE": 120, "MID": 300, "SMALL": 900}
 EMPTY_COOLDOWN_SEC = 6 * 3600
 TOP_TRADERS_N = int(os.getenv("LIQMAP_TOP_TRADERS_N", "50"))
 TOP_REFRESH_SEC = int(os.getenv("LIQMAP_TOP_REFRESH_SEC", "90"))
-LEADERBOARD_REFRESH_SEC = 1800
+LEADERBOARD_REFRESH_SEC = int(os.getenv("LIQMAP_LEADERBOARD_REFRESH_SEC", "1800"))
+# メモリ保護: 非公式リーダーボードは巨大JSONで、丸ごと展開するとメモリが急スパイクしOOMの原因になる。
+# ストリーミング取得で上限バイトを超えたらその回はスキップ (WS収集で継続)。
+LEADERBOARD_MAX_BYTES = int(os.getenv("LIQMAP_LEADERBOARD_MAX_MB", "25")) * 1024 * 1024
+# 極小インスタンスで完全に無効化したい場合 (Smart Money と大口初期投入を諦め、WS収集のみにする)
+DISABLE_LEADERBOARD = os.getenv("LIQMAP_DISABLE_LEADERBOARD", "0").strip().lower() in ("1", "true", "yes")
 # HLP等のVault・追跡除外アドレス (カンマ区切り)
 IGNORE_ADDRS = {a.strip().lower() for a in os.getenv("LIQMAP_IGNORE_ADDRS", "").split(",") if a.strip()}
 COINGLASS_KEY = os.getenv("COINGLASS_API_KEY", "")
@@ -133,13 +138,35 @@ http = httpx.AsyncClient(timeout=10)
 
 
 # ---------------- Harvester ----------------
+async def _fetch_leaderboard_json() -> dict:
+    """
+    リーダーボードをサイズ上限付きストリーミングで取得する (メモリ保護)。
+    非公式エンドポイントは巨大JSONで、丸ごと展開するとメモリが急スパイクしOOMの原因になるため、
+    上限バイトを超えた時点で中断してスキップする (呼び出し側は WS収集で継続)。
+    """
+    buf = bytearray()
+    async with http.stream("GET", LEADERBOARD_URL) as resp:
+        resp.raise_for_status()
+        async for chunk in resp.aiter_bytes():
+            buf.extend(chunk)
+            if len(buf) > LEADERBOARD_MAX_BYTES:
+                raise RuntimeError(
+                    f"leaderboard > {LEADERBOARD_MAX_BYTES // (1024 * 1024)}MB — skip (メモリ保護)"
+                )
+    return json.loads(buf)
+
+
 async def leaderboard_loop():
     """大口アドレスの初期投入 + 上位50人リストの定期更新 (失敗しても致命的ではない)"""
+    if DISABLE_LEADERBOARD:
+        log.info("leaderboard disabled (LIQMAP_DISABLE_LEADERBOARD) — WS収集のみで運用")
+        return
     first = True
     while True:
         try:
-            r = await http.get(LEADERBOARD_URL)
-            rows = r.json().get("leaderboardRows", [])
+            data = await _fetch_leaderboard_json()
+            rows = data.get("leaderboardRows", [])
+            data = None  # 元JSONは早めに解放
 
             def month_pnl(row):
                 for name, perf in row.get("windowPerformances", []):
@@ -170,6 +197,7 @@ async def leaderboard_loop():
                 log.info("leaderboard bootstrap: %d addresses queued", min(len(rows), LEADERBOARD_TOP_N))
                 first = False
             log.info("top traders list refreshed: %d addrs", len(store.top_list))
+            del rows, by_pnl  # 大きな中間データを次のsleep前に解放
         except Exception as e:
             log.warning("leaderboard unavailable (%s) — WS収集のみで継続", e)
         await asyncio.sleep(LEADERBOARD_REFRESH_SEC)
