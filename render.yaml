@@ -19,4 +19,9 @@ services:
         sync: false                     # 未設定なら経済カレンダーは Deribit満期のみ
       - key: FRONTEND_ORIGIN
         sync: false                     # Vercel のURL (例 https://xxx.vercel.app)。CORS許可元
+      # --- メモリ保護 (Starter=512MB 前提。値は render.yaml に直接持つ) ---
+      - key: LIQMAP_MAX_ADDRESSES
+        value: "6000"                   # 追跡アドレス上限。超過分は追加せずメモリ増加を止める
+      - key: LIQMAP_LEADERBOARD_N
+        value: "1500"                   # 起動時に投入する大口アドレス数 (少ないほど省メモリ)
       # COINGLASS_API_KEY は現方針では不要

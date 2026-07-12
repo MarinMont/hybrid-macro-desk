@@ -54,6 +54,10 @@ LEADERBOARD_URL = "https://stats-data.hyperliquid.xyz/Mainnet/leaderboard"
 COIN = os.getenv("LIQMAP_COIN", "BTC")
 WEIGHT_BUDGET_PER_MIN = int(os.getenv("HL_WEIGHT_BUDGET", "600"))
 LEADERBOARD_TOP_N = int(os.getenv("LIQMAP_LEADERBOARD_N", "3000"))
+# 追跡アドレス数の上限 (メモリ保護)。WS収集は無制限に新規アドレスを見つけるため、
+# 小規模インスタンス (Render Starter=512MB等) では上限を設けないとOOMする。
+# 大口はリーダーボード由来で優先確保されるため、上限に達しても実用上のカバー率は保たれる。
+MAX_ADDRESSES = int(os.getenv("LIQMAP_MAX_ADDRESSES", "8000"))
 BIN_PCT = float(os.getenv("LIQMAP_BIN_PCT", "0.0025"))   # 0.25%刻み
 RANGE_PCT = float(os.getenv("LIQMAP_RANGE_PCT", "0.15")) # mark±15%
 STALE_POSITION_SEC = 3600  # 1時間更新が無いポジションは集計から除外
@@ -111,6 +115,10 @@ class Store:
     def add_address(self, addr: str, due: float | None = None):
         addr = addr.lower()
         if addr in self.seen:
+            return
+        # メモリ上限: 上限到達後は新規アドレスを追加しない (小規模インスタンスのOOM対策)。
+        # リーダーボード由来の大口は起動時に先に投入されるため優先的に確保される。
+        if len(self.seen) >= MAX_ADDRESSES:
             return
         self.seen.add(addr)
         self.meta[addr] = {"tier": "SMALL", "empty_count": 0, "cooldown_until": 0}
