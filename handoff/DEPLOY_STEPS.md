@@ -15,9 +15,13 @@
 ---
 
 ## 事前確認（1分）
-- コードが GitHub の **`MarinMont/hybrid-macro-desk`** にあり、ブランチ
-  **`claude/hyper-liquid-trading-app-4zgadr`** に最新が入っていること。
-- （もしこのブランチが本流 `main` にマージ済みなら、以下の「ブランチ選択」では `main` を選んでOKです。）
+- コードは GitHub の **`MarinMont/hybrid-macro-desk`** にあり、ブランチ
+  **`claude/hyper-liquid-trading-app-4zgadr`** に最新が入っています。
+- このリポジトリには現在 `main` ブランチは無く、**この `claude/...` ブランチが「既定ブランチ」**です。
+  そのため Render/Vercel では**最初からこのブランチが選ばれた状態**になります → **ブランチ選択はそのままでOK**（特別な操作は不要）。
+- 確認方法: ブラウザで https://github.com/MarinMont/hybrid-macro-desk を開き、
+  ファイル一覧左上のブランチ切替ボタンが `claude/hyper-liquid-trading-app-4zgadr` になっていること、
+  最新コミットが「Wire app for Vercel(frontend) + Render(backend) deploy」であることを確認する。
 
 ---
 
