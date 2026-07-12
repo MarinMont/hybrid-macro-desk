@@ -98,6 +98,39 @@ def test_taker_delta_usd():
     assert calc.taker_delta_usd(100, 40, 60000) == 60 * 60000
 
 
+# ---------------- aggtrade_delta (Binance aggTrades) ----------------
+def test_aggtrade_delta_basic():
+    # m=False → テイカー買い, m=True → テイカー売り
+    trades = [
+        {"p": "100", "q": "2", "m": False},   # buy  200
+        {"p": "100", "q": "1", "m": True},    # sell 100
+        {"p": "200", "q": "0.5", "m": False}, # buy  100
+    ]
+    d = calc.aggtrade_delta(trades)
+    assert d["buyBase"] == 2.5
+    assert d["sellBase"] == 1.0
+    assert d["buyUsd"] == 300.0
+    assert d["sellUsd"] == 100.0
+    assert d["deltaUsd"] == 200.0
+    assert d["deltaBase"] == 1.5
+    assert d["count"] == 3
+
+
+def test_aggtrade_delta_empty():
+    d = calc.aggtrade_delta([])
+    assert d == {
+        "buyBase": 0.0, "sellBase": 0.0, "buyUsd": 0.0, "sellUsd": 0.0,
+        "deltaBase": 0.0, "deltaUsd": 0.0, "count": 0,
+    }
+
+
+def test_aggtrade_delta_all_sell():
+    trades = [{"p": "50000", "q": "1", "m": True}, {"p": "50000", "q": "0.4", "m": True}]
+    d = calc.aggtrade_delta(trades)
+    assert d["buyUsd"] == 0.0
+    assert d["deltaUsd"] == -70000.0
+
+
 # ---------------- oi_change_pct_24h ----------------
 def test_oi_change_pct_24h():
     hist = [100.0] * 48

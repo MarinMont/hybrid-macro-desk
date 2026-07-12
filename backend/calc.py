@@ -94,6 +94,39 @@ def cvd(taker_series: Sequence[float]) -> list[float]:
     return out
 
 
+def aggtrade_delta(trades: Sequence[dict]) -> dict:
+    """
+    Binance aggTrades のリストからテイカーデルタを計算する (takerlongshortRatioの近似より精緻)。
+    各 trade は {"p": price, "q": qty, "m": isBuyerMaker} を持つ。
+      - m == False → 買い手がテイカー(攻撃的な買い) → buy
+      - m == True  → 買い手がメイカー ⇒ 売り手がテイカー(攻撃的な売り) → sell
+    返り値: {buyBase, sellBase, buyUsd, sellUsd, deltaBase, deltaUsd, count}
+    USD換算は price×qty (quote volume)。
+    """
+    buy_base = sell_base = buy_usd = sell_usd = 0.0
+    n = 0
+    for t in trades:
+        q = float(t["q"])
+        p = float(t["p"])
+        usd = p * q
+        if t.get("m"):          # buyer is maker → taker is the SELLER
+            sell_base += q
+            sell_usd += usd
+        else:                   # buyer is the taker (aggressive buy)
+            buy_base += q
+            buy_usd += usd
+        n += 1
+    return {
+        "buyBase": buy_base,
+        "sellBase": sell_base,
+        "buyUsd": buy_usd,
+        "sellUsd": sell_usd,
+        "deltaBase": buy_base - sell_base,
+        "deltaUsd": buy_usd - sell_usd,
+        "count": n,
+    }
+
+
 def oi_change_pct_24h(oi_hist: Sequence[float]) -> float | None:
     """
     oiChangePct24h = (oiHist[-1] - oiHist[-25]) / oiHist[-25] * 100。

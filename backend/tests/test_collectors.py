@@ -7,7 +7,7 @@ import datetime as dt
 
 import pytest
 
-from collectors import market, derivs, macro
+from collectors import market, derivs, macro, aggdelta
 
 
 # ---------------- フェイクHTTP ----------------
@@ -140,3 +140,36 @@ def test_build_warning_ignores_non_high():
     now = int(time.time() * 1000)
     events = [{"ts": now + 3 * 3600 * 1000, "impact": "MED", "name": "PMI"}]
     assert macro._build_warning(events)["active"] is False
+
+
+# ---------------- aggdelta: 増分(aggId)による二重計上防止 ----------------
+class FakeAggClient:
+    def __init__(self, batches):
+        self._batches = list(batches)
+
+    async def get(self, url, params=None):
+        return FakeResp(self._batches.pop(0))
+
+
+@pytest.mark.asyncio
+async def test_aggdelta_incremental_no_double_count():
+    from collections import deque
+    # 初回バッチ (baseline) → 2回目で新規aggIdのみ計上
+    batch1 = [{"a": 1, "p": "100", "q": "1", "m": False},
+              {"a": 2, "p": "100", "q": "1", "m": True}]
+    batch2 = [{"a": 2, "p": "100", "q": "1", "m": True},    # 既出 (a=2) → 無視
+              {"a": 3, "p": "100", "q": "2", "m": False}]   # 新規 buy 200
+    aggdelta._deps["http"] = FakeAggClient([batch1, batch2])
+    aggdelta._state.update({"last_agg_id": None, "last_price": None, "cvd_usd": 0.0,
+                            "interval": None, "series": deque(maxlen=10), "updated": 0.0})
+
+    await aggdelta._poll_once()   # baseline のみ (計上しない)
+    assert aggdelta._state["last_agg_id"] == 2
+    assert aggdelta._state["cvd_usd"] == 0.0
+    assert len(aggdelta._state["series"]) == 0
+
+    await aggdelta._poll_once()   # a=3 の buy 200 のみ計上
+    assert aggdelta._state["last_agg_id"] == 3
+    assert aggdelta._state["cvd_usd"] == 200.0
+    assert aggdelta._state["interval"]["count"] == 1
+    assert aggdelta._state["series"][-1]["cvdUsd"] == 200

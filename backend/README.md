@@ -41,6 +41,11 @@ uvicorn liqmap_service:app --port 8787
 | `GET /api/macro` | events[]/warning{active,eventName,ts} | Finnhub・Deribit満期計算・Claude注釈(日次) |
 | `POST /api/ai-overview` | メトリクスsnapshot → { text } | Anthropic API (60sキャッシュ) |
 | `GET /api/entry-state` | entry_state.json をそのまま | ファイル監視 (不在なら404) |
+| `GET /api/agg-delta` | interval{buyUsd,sellUsd,deltaUsd,count}/cvdUsd/series[] | Binance aggTrades を約定単位で集計した精緻なテイカーデルタ/CVD |
+
+`/api/agg-delta` は `takerlongshortRatio` 近似より精緻な、aggTrade 単位のデルタ計算 (増分aggIdで二重計上防止・
+メモリは固定長リングで有界)。既存の `/api/derivs` やフロントの各パネルには影響しない追加エンドポイント。
+関連env: `AGG_DELTA_POLL_SEC` (既定12s) / `AGG_DELTA_SERIES_MAX` (既定360)。
 
 環境変数 (`.env`, `.env.example` 参照): `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` / `FINNHUB_API_KEY` /
 `ENTRY_STATE_PATH`。未設定でも該当パネルがフォールバックするだけで他機能に影響はない。

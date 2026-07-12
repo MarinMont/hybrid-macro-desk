@@ -11,6 +11,6 @@ liqmap_service.py が末尾で各モジュールを include_router + init + run 
 (画面全体を殺さない — SPEC §9)。
 """
 
-from . import market, derivs, macro, ai, entry_state  # noqa: F401
+from . import market, derivs, macro, ai, entry_state, aggdelta  # noqa: F401
 
-ALL = (market, derivs, macro, ai, entry_state)
+ALL = (market, derivs, macro, ai, entry_state, aggdelta)
