@@ -47,6 +47,24 @@ uvicorn liqmap_service:app --port 8787
 メモリは固定長リングで有界)。既存の `/api/derivs` やフロントの各パネルには影響しない追加エンドポイント。
 関連env: `AGG_DELTA_POLL_SEC` (既定12s) / `AGG_DELTA_SERIES_MAX` (既定360)。
 
+### Entry Console 連携: セットアップ指定値 (entry_state.json)
+
+`entry_state.json` に任意の `setup` を足すと、フロントの「セットアップ」カードが**あなたが決めた指定値**
+(建値/損切り/利確) を表示する (無ければ従来の EMA20×ATR 機械式にフォールバック)。アプリは表示のみで、
+数値の決定はファイル側 = 外部に置く思想 (SPEC §7)。見本は `backend/entry_state.sample.json`。
+
+```jsonc
+"setup": {
+  "side": "LONG",                     // 省略時は stop<entry で LONG と推定
+  "entry": 63000, "stop": 61500,
+  "targets": [64500, 66000, 67500],   // 1〜複数。R倍数は自動計算
+  "note": "任意メモ"
+}
+```
+
+使い方: `cp backend/entry_state.sample.json backend/entry_state.json` して値を編集
+(または `ENTRY_STATE_PATH` が指す場所に置く)。`entry_state.json` は `.gitignore` 済み。
+
 環境変数 (`.env`, `.env.example` 参照): `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` / `FINNHUB_API_KEY` /
 `ENTRY_STATE_PATH`。未設定でも該当パネルがフォールバックするだけで他機能に影響はない。
 

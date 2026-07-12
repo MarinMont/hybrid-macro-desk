@@ -89,7 +89,22 @@ const adaptEntryState = (j) => {
     regime: j.regime,
     regimeConf: j.regime_confidence ?? 0,
     regimeNote: j.regime_note ?? "",
+    // 任意: entry_state.json に setup(建値/損切り/利確) があればそのまま渡す。
+    // 無ければ null → セットアップ・カードは従来の機械式(EMA20×ATR)にフォールバック。
+    setup: normalizeSetup(j.setup),
   };
+};
+
+// entry_state.json の setup を検証・正規化。entry/stop/targets が数値で揃っていなければ null。
+const normalizeSetup = (s) => {
+  if (!s) return null;
+  const entry = Number(s.entry);
+  const stop = Number(s.stop);
+  const targets = Array.isArray(s.targets) ? s.targets.map(Number).filter((x) => !isNaN(x)) : [];
+  if (isNaN(entry) || isNaN(stop) || !targets.length) return null;
+  // side は明示があれば優先、無ければ損切りが建値の下=LONG / 上=SHORT で推定
+  const side = s.side === "LONG" || s.side === "SHORT" ? s.side : stop < entry ? "LONG" : "SHORT";
+  return { side, entry, stop, targets, note: s.note ?? null };
 };
 
 // ---------- math helpers ----------
@@ -1160,8 +1175,61 @@ export default function HybridMacroDeskBTC() {
                   </div>
                 </Panel>
 
-                {/* セットアップ — 方向性ベースの機械式目安 (ユーザー承認のもと SPEC§0 を上書きして追加) */}
+                {/* セットアップ — 指定値(entry_state.json)を最優先、無ければ方向性ベースの機械式目安 */}
                 {(() => {
+                  // (1) entry_state.json の setup(指定値)があればそれを表示 — アプリは表示のみ (SPEC §7)
+                  const sv = entry.setup;
+                  if (sv) {
+                    const svColor = sv.side === "LONG" ? C.green : C.red;
+                    const svR = Math.abs(sv.entry - sv.stop) || 1;
+                    const svRPct = (svR / m.price) * 100;
+                    const svTiles = [
+                      { k: "エントリー", sub: "指定値", v: sv.entry, c: C.orangeBright },
+                      { k: "損切り", sub: "指定値", v: sv.stop, c: C.red },
+                      ...sv.targets.map((t, i) => ({
+                        k: `利確 T${i + 1}`, sub: `${(Math.abs(t - sv.entry) / svR).toFixed(1)}R`, v: t, c: C.green,
+                      })),
+                    ];
+                    return (
+                      <div className="lg:col-span-3">
+                        <Panel
+                          title="セットアップ — 指定値 (Entry Console 連携)"
+                          accent
+                          right={
+                            <div className="flex items-center gap-2">
+                              <Tag color={svColor}>{sv.side}</Tag>
+                              <Tag color={C.green}>指定値 · entry_state.json</Tag>
+                            </div>
+                          }
+                        >
+                          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                            {svTiles.map((t) => (
+                              <div key={t.k} className="rounded-lg px-3 py-2.5" style={{ background: C.panelSoft, border: `1px solid ${C.borderSoft}` }}>
+                                <div className="text-xs" style={{ color: C.faint, fontFamily: FONT_MONO }}>{t.k}</div>
+                                <div className="text-lg font-bold" style={{ color: t.c, fontFamily: FONT_MONO }}>{fmtPx(t.v)}</div>
+                                <div className="text-xs" style={{ color: C.faint }}>{t.sub}</div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs" style={{ fontFamily: FONT_MONO }}>
+                            <span style={{ color: C.muted }}>リスク幅(1R) <span style={{ color: C.text }}>${Math.round(svR).toLocaleString()} ({svRPct.toFixed(2)}%)</span></span>
+                            <span style={{ color: C.muted }}>リスク:リワード <span style={{ color: C.green }}>{sv.targets.map((t, i) => `T${i + 1} 1:${(Math.abs(t - sv.entry) / svR).toFixed(1)}`).join(" · ")}</span></span>
+                            <span style={{ color: C.muted }}>現在値 <span style={{ color: C.text }}>{fmtPx(m.price)}</span> はエントリーの <span style={{ color: m.price >= sv.entry ? C.green : C.red }}>{m.price >= sv.entry ? "上" : "下"}</span></span>
+                          </div>
+                          {sv.note && (
+                            <div className="text-xs mt-3 leading-relaxed" style={{ color: C.muted }}>
+                              <span style={{ color: C.orangeBright }}>✦ </span>{sv.note}
+                            </div>
+                          )}
+                          <div className="mt-3 rounded-lg px-3 py-2.5 text-xs leading-relaxed" style={{ background: `${C.orange}12`, border: `1px dashed ${C.orangeDim}`, color: C.orangeBright }}>
+                            ⚖ GO but WAIT — Entry Console で設定した指定値の表示。建玉サイズ・執行・最終判断は常にトレーダーの拒否権に従う。
+                          </div>
+                        </Panel>
+                      </div>
+                    );
+                  }
+
+                  // (2) 指定値が無ければ方向性ベースの機械式目安 (ユーザー承認のもと SPEC§0 を上書きして追加)
                   const dir = entry.direction; // LONG | SHORT | null
                   const long = dir === "LONG";
                   const short = dir === "SHORT";

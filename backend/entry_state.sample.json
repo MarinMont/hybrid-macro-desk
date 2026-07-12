@@ -1,0 +1,23 @@
+{
+  "_comment": "Entry Console 連携ファイルの見本。これを entry_state.json としてコピーし、ENTRY_STATE_PATH が指す場所に置く。バックエンドは中身をそのまま /api/entry-state で配信し、フロントは表示のみ (SPEC §7)。setup は任意の追加項目で、あれば『セットアップ』カードが指定値を表示、無ければ機械式(EMA20×ATR)にフォールバックする。",
+  "state": "ARMED",
+  "direction": "LONG",
+  "since": "2026-07-12T04:10:00Z",
+  "pillars": {
+    "structure": { "ok": true, "value": "HH/HL継続 · EMA20上" },
+    "cvd": { "ok": true, "value": "24hネット買い越し" },
+    "oi": { "ok": false, "value": "24h -3.4% 新規流入なし" }
+  },
+  "next_condition": "EMA20への押し目形成 → PULLBACK",
+  "regime": "uptrend",
+  "regime_confidence": 0.62,
+  "regime_note": "H4終値がEMA50割れでレンジへ降格",
+
+  "setup": {
+    "side": "LONG",
+    "entry": 63000,
+    "stop": 61500,
+    "targets": [64500, 66000, 67500],
+    "note": "Claudeとの検討で決めた指定値。EMA20押し目で入り、直近安値下に損切り、上方の清算クラスターをT2/T3に。"
+  }
+}
