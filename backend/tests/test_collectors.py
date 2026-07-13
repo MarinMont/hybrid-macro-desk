@@ -173,3 +173,69 @@ async def test_aggdelta_incremental_no_double_count():
     assert aggdelta._state["cvd_usd"] == 200.0
     assert aggdelta._state["interval"]["count"] == 1
     assert aggdelta._state["series"][-1]["cvdUsd"] == 200
+
+
+# ---------------- リーダーボードの ijson 逐次パース (メモリ一定・上位抽出) ----------------
+class FakeStreamCtx:
+    def __init__(self, data: bytes, chunk: int = 16):
+        self._data, self._chunk = data, chunk
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    def raise_for_status(self):
+        pass
+
+    async def aiter_bytes(self):
+        for i in range(0, len(self._data), self._chunk):
+            yield self._data[i:i + self._chunk]
+
+
+class FakeStreamHttp:
+    def __init__(self, data: bytes):
+        self._data = data
+
+    def stream(self, method, url):
+        return FakeStreamCtx(self._data)
+
+
+@pytest.mark.asyncio
+async def test_harvest_leaderboard_ranks_and_bootstrap():
+    import liqmap_service as L
+    payload = (
+        '{"leaderboardRows":['
+        '{"ethAddress":"0xAAA","accountValue":"1000","windowPerformances":[["day",{"pnl":"1"}],["month",{"pnl":"500"}]]},'
+        '{"ethAddress":"0xBBB","accountValue":"5000","windowPerformances":[["month",{"pnl":"100"}]]},'
+        '{"ethAddress":"0xCCC","accountValue":"200","windowPerformances":[["month",{"pnl":"900"}]]}'
+        ']}'
+    ).encode()
+    L.http = FakeStreamHttp(payload)
+    top_list, bootstrap = await L._harvest_leaderboard()
+    # 30日PnL順: CCC(900) > AAA(500) > BBB(100)
+    assert [t["addr"] for t in top_list] == ["0xccc", "0xaaa", "0xbbb"]
+    assert [t["rank"] for t in top_list] == [1, 2, 3]
+    assert top_list[0]["month_pnl"] == 900.0
+    # 口座残高順: BBB(5000) > AAA(1000) > CCC(200)
+    assert bootstrap == ["0xbbb", "0xaaa", "0xccc"]
+
+
+@pytest.mark.asyncio
+async def test_harvest_leaderboard_respects_top_n():
+    import liqmap_service as L
+    rows = ",".join(
+        f'{{"ethAddress":"0x{i:03x}","accountValue":"{i}","windowPerformances":[["month",{{"pnl":"{i}"}}]]}}'
+        for i in range(1, 21)
+    )
+    L.http = FakeStreamHttp(('{"leaderboardRows":[' + rows + "]}").encode())
+    orig_pnl, orig_acct = L.TOP_TRADERS_N, L.LEADERBOARD_TOP_N
+    L.TOP_TRADERS_N, L.LEADERBOARD_TOP_N = 3, 5
+    try:
+        top_list, bootstrap = await L._harvest_leaderboard()
+    finally:
+        L.TOP_TRADERS_N, L.LEADERBOARD_TOP_N = orig_pnl, orig_acct
+    assert len(top_list) == 3          # 上位3件のみ保持
+    assert top_list[0]["month_pnl"] == 20.0
+    assert len(bootstrap) == 5         # 口座残高上位5件のみ

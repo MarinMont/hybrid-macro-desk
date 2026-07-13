@@ -3,3 +3,4 @@ uvicorn[standard]>=0.30
 httpx>=0.27
 websockets>=12.0
 python-dotenv>=1.0
+ijson>=3.2          # リーダーボード(巨大JSON)の逐次パース用。一括展開せずメモリ一定でOOM回避

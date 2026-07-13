@@ -37,6 +37,7 @@ import time
 from collections import deque
 
 import httpx
+import ijson
 import websockets
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -67,9 +68,9 @@ EMPTY_COOLDOWN_SEC = 6 * 3600
 TOP_TRADERS_N = int(os.getenv("LIQMAP_TOP_TRADERS_N", "50"))
 TOP_REFRESH_SEC = int(os.getenv("LIQMAP_TOP_REFRESH_SEC", "90"))
 LEADERBOARD_REFRESH_SEC = int(os.getenv("LIQMAP_LEADERBOARD_REFRESH_SEC", "1800"))
-# メモリ保護: 非公式リーダーボードは巨大JSONで、丸ごと展開するとメモリが急スパイクしOOMの原因になる。
-# ストリーミング取得で上限バイトを超えたらその回はスキップ (WS収集で継続)。
-LEADERBOARD_MAX_BYTES = int(os.getenv("LIQMAP_LEADERBOARD_MAX_MB", "25")) * 1024 * 1024
+# リーダーボードは ijson で逐次パースし、上位だけをヒープで保持する (メモリはほぼ一定でOOMしない)。
+# よって MAX_BYTES はメモリ保護ではなく帯域の安全弁。0 = 無制限 (既定)。>0 なら途中打ち切り。
+LEADERBOARD_MAX_BYTES = int(os.getenv("LIQMAP_LEADERBOARD_MAX_MB", "0")) * 1024 * 1024
 # 極小インスタンスで完全に無効化したい場合 (Smart Money と大口初期投入を諦め、WS収集のみにする)
 DISABLE_LEADERBOARD = os.getenv("LIQMAP_DISABLE_LEADERBOARD", "0").strip().lower() in ("1", "true", "yes")
 # HLP等のVault・追跡除外アドレス (カンマ区切り)
@@ -138,22 +139,77 @@ http = httpx.AsyncClient(timeout=10)
 
 
 # ---------------- Harvester ----------------
-async def _fetch_leaderboard_json() -> dict:
+def _row_month_pnl(row) -> float:
+    for wp in row.get("windowPerformances", []) or []:
+        try:
+            if wp[0] == "month":
+                return float(wp[1].get("pnl", 0))
+        except (TypeError, IndexError, ValueError):
+            continue
+    return 0.0
+
+
+def _push_top(heap: list, key: float, idx: int, payload, n: int):
+    """上位n件だけを保持する最小ヒープ。idxはキー同値時のタイブレーク(payload比較を避ける)。"""
+    item = (key, idx, payload)
+    if len(heap) < n:
+        heapq.heappush(heap, item)
+    elif key > heap[0][0]:
+        heapq.heapreplace(heap, item)
+
+
+@ijson.coroutine
+def _leaderboard_sink(state: dict):
+    """ijsonが1行ずつ送ってくる leaderboardRow を受け取り、上位ヒープだけ更新 (メモリ一定)。"""
+    while True:
+        row = (yield)
+        addr = row.get("ethAddress")
+        if not addr:
+            continue
+        addr = addr.lower()
+        if addr in IGNORE_ADDRS:
+            continue
+        state["idx"] += 1
+        idx = state["idx"]
+        acct = 0.0
+        try:
+            acct = float(row.get("accountValue", 0) or 0)
+        except (TypeError, ValueError):
+            acct = 0.0
+        mpnl = _row_month_pnl(row)
+        _push_top(state["by_pnl"], mpnl, idx, (addr, mpnl, acct), TOP_TRADERS_N)
+        _push_top(state["by_acct"], acct, idx, addr, LEADERBOARD_TOP_N)
+
+
+async def _harvest_leaderboard() -> tuple[list, list]:
     """
-    リーダーボードをサイズ上限付きストリーミングで取得する (メモリ保護)。
-    非公式エンドポイントは巨大JSONで、丸ごと展開するとメモリが急スパイクしOOMの原因になるため、
-    上限バイトを超えた時点で中断してスキップする (呼び出し側は WS収集で継続)。
+    リーダーボードを ijson で逐次パースし、上位だけ抽出する。
+    巨大JSONを丸ごと展開しないため、メモリは (TOP_TRADERS_N + LEADERBOARD_TOP_N) 件相当で一定。
+    返り値: (top_list[30日PnL順], bootstrap_addrs[口座残高順])
     """
-    buf = bytearray()
-    async with http.stream("GET", LEADERBOARD_URL) as resp:
-        resp.raise_for_status()
-        async for chunk in resp.aiter_bytes():
-            buf.extend(chunk)
-            if len(buf) > LEADERBOARD_MAX_BYTES:
-                raise RuntimeError(
-                    f"leaderboard > {LEADERBOARD_MAX_BYTES // (1024 * 1024)}MB — skip (メモリ保護)"
-                )
-    return json.loads(buf)
+    state = {"by_pnl": [], "by_acct": [], "idx": 0}
+    sink = _leaderboard_sink(state)
+    coro = ijson.items_coro(sink, "leaderboardRows.item", use_float=True)
+    total = 0
+    try:
+        async with http.stream("GET", LEADERBOARD_URL) as resp:
+            resp.raise_for_status()
+            async for chunk in resp.aiter_bytes():
+                total += len(chunk)
+                if LEADERBOARD_MAX_BYTES and total > LEADERBOARD_MAX_BYTES:
+                    log.warning("leaderboard > %dMB — 途中打ち切り (部分集計で継続)", LEADERBOARD_MAX_BYTES // (1024 * 1024))
+                    break
+                coro.send(chunk)
+    finally:
+        coro.close()
+
+    top_pnl = sorted(state["by_pnl"], key=lambda x: x[0], reverse=True)
+    top_list = [
+        {"addr": p[2][0], "rank": i + 1, "month_pnl": p[2][1], "account_value": p[2][2]}
+        for i, p in enumerate(top_pnl)
+    ]
+    bootstrap = [a[2] for a in sorted(state["by_acct"], key=lambda x: x[0], reverse=True)]
+    return top_list, bootstrap
 
 
 async def leaderboard_loop():
@@ -164,40 +220,16 @@ async def leaderboard_loop():
     first = True
     while True:
         try:
-            data = await _fetch_leaderboard_json()
-            rows = data.get("leaderboardRows", [])
-            data = None  # 元JSONは早めに解放
-
-            def month_pnl(row):
-                for name, perf in row.get("windowPerformances", []):
-                    if name == "month":
-                        return float(perf.get("pnl", 0))
-                return 0.0
-
-            rows = [x for x in rows if x.get("ethAddress") and x["ethAddress"].lower() not in IGNORE_ADDRS]
-
-            # 上位50人 = 30日PnLでランク付け (「今勝っている人の目線」を見るため)
-            by_pnl = sorted(rows, key=month_pnl, reverse=True)[:TOP_TRADERS_N]
-            store.top_list = [
-                {
-                    "addr": x["ethAddress"].lower(),
-                    "rank": i + 1,
-                    "month_pnl": month_pnl(x),
-                    "account_value": float(x.get("accountValue", 0)),
-                }
-                for i, x in enumerate(by_pnl)
-            ]
-
+            top_list, bootstrap = await _harvest_leaderboard()
+            store.top_list = top_list
             if first:
                 # 清算マップ用: 口座残高上位を初回一括投入
-                rows.sort(key=lambda x: float(x.get("accountValue", 0)), reverse=True)
                 now = time.time()
-                for i, row in enumerate(rows[:LEADERBOARD_TOP_N]):
-                    store.add_address(row["ethAddress"], due=now + i * 0.15)
-                log.info("leaderboard bootstrap: %d addresses queued", min(len(rows), LEADERBOARD_TOP_N))
+                for i, addr in enumerate(bootstrap):
+                    store.add_address(addr, due=now + i * 0.15)
+                log.info("leaderboard bootstrap: %d addresses queued", len(bootstrap))
                 first = False
             log.info("top traders list refreshed: %d addrs", len(store.top_list))
-            del rows, by_pnl  # 大きな中間データを次のsleep前に解放
         except Exception as e:
             log.warning("leaderboard unavailable (%s) — WS収集のみで継続", e)
         await asyncio.sleep(LEADERBOARD_REFRESH_SEC)
