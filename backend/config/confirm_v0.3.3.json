@@ -1,0 +1,12 @@
+{
+  "version": "v0.3.3",
+  "timeframe": "15m",
+  "window_bars": 3,
+  "x_ratio": 0.05,
+  "atr_coef": 0.75,
+  "atr_len": 14,
+  "vol_floor_mult": 3.0,
+  "vol_median_len": 96,
+  "accept_consecutive": 2,
+  "delta_method": "taker"
+}
