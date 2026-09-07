@@ -20,6 +20,9 @@ dist/
 *.log
 npm-debug.log*
 
+# --- セットアップコンソールの台帳/フロー/履歴 (ローカル生成物) ---
+backend/data/
+
 # --- Entry Console 連携 (ローカル生成物) ---
 entry_state.json
 backend/entry_state.json
