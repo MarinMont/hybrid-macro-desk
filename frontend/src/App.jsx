@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 // Theme: Claude orange × warm dark / semantic up-down colors
 // ============================================================
 
-const C = {
+export const C = {
   bg: "#141210",
   panel: "#1D1915",
   panelSoft: "#242019",
@@ -29,16 +29,16 @@ const C = {
   blueDim: "#27456B",
 };
 
-const FONT_MONO = "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace";
-const FONT_UI = "'Zen Kaku Gothic New', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif";
+export const FONT_MONO = "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace";
+export const FONT_UI = "'Zen Kaku Gothic New', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif";
 
 // ---------- backend (ローカル or デプロイ先) ----------
 // 全ての外部データ取得は自分のbackend 1か所に一本化する (デプロイ時のCSP/CORS対策)。
 // デプロイでは VITE_API_BASE に Render のURL(https://xxx.onrender.com)を設定する。
 // 未設定時はローカル開発用に localhost:8787。未検出パネルはサンプル表示+黄タグ (SPEC §6)。
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8787";
+export const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8787";
 
-const jget = async (path, ms = 2500) => {
+export const jget = async (path, ms = 2500) => {
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), ms);
   try {
@@ -51,7 +51,7 @@ const jget = async (path, ms = 2500) => {
   }
 };
 
-const jpost = async (path, body, ms = 6000) => {
+export const jpost = async (path, body, ms = 6000) => {
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), ms);
   try {
@@ -457,7 +457,7 @@ function deriveMetrics(candles, ctx, fng) {
 }
 
 // ---------- small components ----------
-const Tag = ({ children, color }) => (
+export const Tag = ({ children, color }) => (
   <span
     className="px-2 py-0.5 rounded text-xs font-semibold tracking-wide"
     style={{ background: `${color}22`, color, fontFamily: FONT_MONO }}
@@ -466,7 +466,7 @@ const Tag = ({ children, color }) => (
   </span>
 );
 
-const Panel = ({ title, right, children, accent }) => (
+export const Panel = ({ title, right, children, accent }) => (
   <div
     className="rounded-xl p-4 flex flex-col"
     style={{ background: C.panel, border: `1px solid ${accent ? C.orangeDim : C.borderSoft}` }}
@@ -964,6 +964,14 @@ export default function HybridMacroDeskBTC() {
           >
             {loading ? "取得中…" : "更新"}
           </button>
+          <a
+            href="#/setup"
+            className="px-3 py-1.5 rounded-lg text-sm font-medium"
+            style={{ color: C.muted, border: `1px solid ${C.borderSoft}`, textDecoration: "none" }}
+            title="セットアップコンソール (別画面)"
+          >
+            セットアップ ⇢
+          </a>
         </div>
       </div>
 

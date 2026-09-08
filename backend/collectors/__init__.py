@@ -1,5 +1,5 @@
 """
-collectors — /api/market /api/derivs /api/macro /api/ai-overview /api/entry-state
+collectors — /api/market /api/derivs /api/macro /api/ai-overview /api/entry-state /api/agg-delta /api/setup/*
 
 各モジュールは以下を公開する疎結合コンポーネント:
   - router : FastAPI APIRouter (エンドポイント)
@@ -11,6 +11,6 @@ liqmap_service.py が末尾で各モジュールを include_router + init + run 
 (画面全体を殺さない — SPEC §9)。
 """
 
-from . import market, derivs, macro, ai, entry_state, aggdelta  # noqa: F401
+from . import market, derivs, macro, ai, entry_state, aggdelta, setup_console  # noqa: F401
 
-ALL = (market, derivs, macro, ai, entry_state, aggdelta)
+ALL = (market, derivs, macro, ai, entry_state, aggdelta, setup_console)
