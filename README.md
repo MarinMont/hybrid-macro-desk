@@ -99,8 +99,11 @@ Deribit満期の自前計算 / Anthropic API（AI概況・カレンダー注釈�
 10. §2.2 台帳 `ts_local` は足の開始時刻で記録し、確定時刻を併記 (暫定)
 11. §7 月末最終営業日の「営業日」は US 営業日 (土日 + `calendar.json` の休場日を除く) と暫定解釈
 12. §9 CSV の列順: Google Sheet「POI水準台帳 v3」C表の列順が不明 — Touch モデルのフィールド順で暫定出力
-13. **S1 の校正 δ の出所**: Pine (reconstruct) でも Binance taker でも再現できない (14:45 が校正 +457 に対し Pine 再構成 −1377)。
-    S2/S3 は Pine と単位まで一致。出所が分かるまで S1 の実データ検証は ATR のみ (`recorded_delta_check=False`)
+13. **S1 の校正 δ の出所** (回答済み 2026-09-08): **TradingView のフットプリント**から転記。ティックルール分類のため Pine (reconstruct) とも
+    Binance taker とも定義が異なり、kline からは再現できない (14:45 が校正 +457 に対し Pine 再構成 −1377)。S2/S3 は Pine と単位まで一致。
+    → S1 は「別定義の δ で校正された場面」として実データ検証は ATR のみ (`recorded_delta_check=False`)。
+    Pine (reconstruct) で S1 を流すと 15:00 成立 / **15:15 成立** / 15:30 成立 / **15:45 沈黙** になる (校正シートは 15:15 沈黙・15:45 成立)。
+    TradingView 上の Pine が 9/4 15:15・15:45 CEST に何を出していたかをオーナーが確認すれば、S1 の期待値を Pine 基準に更新できる
 
 ## 免責
 

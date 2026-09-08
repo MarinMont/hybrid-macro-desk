@@ -55,7 +55,7 @@ S1 = Scene(
         "2026-09-04 15:30": "fire",
         "2026-09-04 15:45": "fire",
     },
-    note="ロング側・成功。出来高床は無効化して判定。校正 δ は Pine (reconstruct) でも Binance taker でも再現できない別ソース (README 未回答事項 13) → 実データ検証は ATR のみ",
+    note="ロング側・成功。出来高床は無効化して判定。校正 δ は TradingView のフットプリント (ティックルール分類) から転記 → Pine (reconstruct) とも taker とも定義が異なり kline から再現不能 (README 13) → 実データ検証は ATR のみ",
     recorded_delta_check=False,
 )
 
