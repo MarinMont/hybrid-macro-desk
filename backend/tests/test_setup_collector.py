@@ -77,6 +77,7 @@ def env(tmp_path, monkeypatch):
 async def _poll(http):
     sc.init(http, None, None)
     sc._st["bars15"] = await sc._fetch("15m", sc.LIMIT_15M)
+    sc._st["bars1"] = await sc._fetch("1m", sc.LIMIT_1M)
     sc._st["bars1h"] = await sc._fetch("1h", sc.LIMIT_1H)
     sc._st["fetched_15m"] = sc.time.time()
     async with sc._lock:
@@ -87,7 +88,7 @@ def test_state_waiting_before_data(env):
     r = env.get("/api/setup/state")
     assert r.status_code == 200
     j = r.json()
-    assert j["data"]["waiting"] and j["latest"] is None and j["version"] == "v0.3.3"
+    assert j["data"]["waiting"] and j["latest"] is None and j["version"] == "v0.3.4"
     assert j["flow"]["state"] == "IDLE" and j["gate"]["placement_allowed"]
     assert len(j["ledger"]["levels"]) == 10
 

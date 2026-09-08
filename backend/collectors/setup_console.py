@@ -145,6 +145,10 @@ def _series(bars15: list[klines.Bar], cfg, inp: dict, now_ms: int):
     meds = [klines.volume_median(closed[: i + 1], cfg.vol_median_len) for i in range(len(closed))]
     wbs = [WindowBar(t=b.t, h=b.h, l=b.l, c=b.c, v=b.v, delta=(d if d is not None else 0.0)) for b, d in zip(closed, ds)]
     res = evaluate_series(wbs, atrs, meds, cfg, inp["mode"], float(inp["ref_s"]), float(inp["ref_l"]), floor_enabled=True)
+    # reconstruct 方式で 1 分足が揃わない足 (δ=None) を含む窓は判定しない (偽の δ=0 で判定を出さない)
+    ok = [d is not None for d in ds]
+    valid = {closed[i].t for i in range(len(closed)) if i >= 2 and all(ok[i - 2:i + 1])}
+    res.diagnoses[:] = [d for d in res.diagnoses if d.t in valid]
     return closed, wbs, atrs, meds, res
 
 
@@ -186,7 +190,9 @@ def _evaluate(now_ms: int) -> None:
     if forming and len(wbs) >= 2:
         fb = forming[-1]
         fd = klines.deltas([fb], cfg.delta_method, _st["bars1"])[0]
-        fw = WindowBar(t=fb.t, h=fb.h, l=fb.l, c=fb.c, v=fb.v, delta=(fd if fd is not None else 0.0))
+        if fd is None:   # 形成中の 15 分足は 1 分足が 15 本揃わない → 揃った分だけの符号付き出来高で暫定表示
+            fd = sum(b.sign_delta for b in _st["bars1"] if fb.t <= b.t < fb.t + 900_000)
+        fw = WindowBar(t=fb.t, h=fb.h, l=fb.l, c=fb.c, v=fb.v, delta=fd)
         fatr = atrmod.atr_series(closed + [fb], cfg.atr_len)[-1]
         fmed = klines.volume_median(closed + [fb], cfg.vol_median_len)
         _st["provisional"] = judge([fw, wbs[-1], wbs[-2]], fatr, cfg, inp["mode"], float(inp["ref_s"]), float(inp["ref_l"]), fmed, True)
@@ -547,7 +553,7 @@ async def replay_endpoint(body: ReplayBody):
     warm = max(cfg.vol_median_len, 400) * 900_000   # ATR 収束 + 床 median の履歴
     try:
         bars = await _fetch_range("15m", from_ms - warm, to_ms + (RP.PATH_BARS + 1) * 900_000)
-        bars1 = await _fetch_range("1m", from_ms, to_ms + 900_000) if cfg.delta_method == "reconstruct" else []
+        bars1 = await _fetch_range("1m", from_ms - 3 * 900_000, to_ms + 900_000) if cfg.delta_method == "reconstruct" else []
     except Exception as e:  # noqa: BLE001
         raise HTTPException(503, f"klines 取得失敗: {e}")
     now_ms = int(time.time() * 1000)

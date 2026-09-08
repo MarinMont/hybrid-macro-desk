@@ -14,7 +14,7 @@ from setup_console.confirm import (
 )
 from setup_console.tz import paris_label, paris_to_ms
 
-CFG = config.load_config("v0.3.3")
+CFG = config.load_config()   # 既定 v0.3.4 (閾値は v0.3.3 と同一、δ は reconstruct)
 
 
 # ---------------- フィクスチャ → WindowBar ----------------
@@ -186,24 +186,28 @@ def test_recorded_atr_within_1pct(recorded, scene):
         assert abs(atrs[i] - fb.atr) / fb.atr <= 0.01, f"{scene.id} {fb.label}: ATR {atrs[i]:.1f} vs 校正 {fb.atr}"
 
 
-@pytest.mark.parametrize("method", ["taker", "reconstruct"])
-@pytest.mark.parametrize("scene", list(cal.SCENES.values()), ids=lambda s: s.id)
-def test_recorded_sum_delta_sign_and_30pct(recorded, scene, method):
+def _delta_scenes():
+    return [s for s in cal.SCENES.values() if s.recorded_delta_check]
+
+
+@pytest.mark.parametrize("scene", _delta_scenes(), ids=lambda s: s.id)
+def test_recorded_sum_delta_sign_and_30pct(recorded, scene):
+    """設定の δ 方式 (reconstruct) で Binance 実データから再構成した Σδ が校正値と符号一致・±30%。"""
     doc = recorded(scene.id)
-    _, _, _, res = recorded_series(doc, scene, method, floor_enabled=False)
+    _, _, _, res = recorded_series(doc, scene, CFG.delta_method, floor_enabled=False)
     got = by_label(res)
     fx = by_label(fixture_series(scene))
     for label in scene.expected:
         side = scene.mode
         g, f = getattr(got[label], side).sum_delta, getattr(fx[label], side).sum_delta
-        assert (g > 0) == (f > 0), f"{scene.id} {label} {method}: 符号不一致 Σδ={g:.0f} vs 校正 {f:.0f}"
-        assert abs(g - f) <= 0.30 * abs(f), f"{scene.id} {label} {method}: Σδ={g:.0f} が校正 {f:.0f} の ±30% 外"
+        assert (g > 0) == (f > 0), f"{scene.id} {label}: 符号不一致 Σδ={g:.0f} vs 校正 {f:.0f}"
+        assert abs(g - f) <= 0.30 * abs(f), f"{scene.id} {label}: Σδ={g:.0f} が校正 {f:.0f} の ±30% 外"
 
 
-@pytest.mark.parametrize("scene", list(cal.SCENES.values()), ids=lambda s: s.id)
+@pytest.mark.parametrize("scene", _delta_scenes(), ids=lambda s: s.id)
 def test_recorded_verdicts_with_real_floor(recorded, scene):
     doc = recorded(scene.id)
-    _, _, _, res = recorded_series(doc, scene, "taker", floor_enabled=True)
+    _, _, _, res = recorded_series(doc, scene, CFG.delta_method, floor_enabled=True)
     got = by_label(res)
     for label, exp in scene.expected.items():
         d = got[label]
@@ -211,28 +215,40 @@ def test_recorded_verdicts_with_real_floor(recorded, scene):
         assert d.verdict == exp, f"{scene.id} {label}: 床有効で {d.verdict} != {exp} (ΣV={getattr(d, scene.mode).sum_vol:.0f}, 床={getattr(d, scene.mode).floor_threshold:.0f})"
 
 
-def test_recorded_s3_accept_warning_at_1445(recorded):
-    doc = recorded("S3")
-    _, _, _, res = recorded_series(doc, cal.S3, "taker", True)
-    t = paris_to_ms("2026-09-03 14:45")
-    assert res.accept_events.get(t) == "S", f"14:45 に受け入れ↑ が出ていない: {res.accept_events}"
+def test_recorded_s1_delta_source_differs_from_binance(recorded):
+    """S1 の校正 δ は Pine (reconstruct) でも taker でも再現できない (別ソース。README 未回答事項 13)。
+    この事実を固定しておく: もし一致するようになったら recorded_delta_check を戻す。"""
+    doc = recorded("S1")
+    fx = by_label(fixture_series(cal.S1))["2026-09-04 15:15"].L.sum_delta   # +125 (校正)
+    for m in ("taker", "reconstruct"):
+        _, _, _, res = recorded_series(doc, cal.S1, m, floor_enabled=False)
+        g = by_label(res)["2026-09-04 15:15"].L.sum_delta
+        assert (g > 0) != (fx > 0), f"S1 15:15 {m}: 符号が一致した ({g:.0f}) — 校正 δ の出所を再確認"
 
 
-def test_recorded_s2_no_accept_warning(recorded):
-    doc = recorded("S2")
-    _, _, _, res = recorded_series(doc, cal.S2, "taker", True)
+@pytest.mark.parametrize("scene", list(cal.SCENES.values()), ids=lambda s: s.id)
+def test_recorded_accept_warning(recorded, scene):
+    """受け入れ警告は Binance の確定終値で検証する (§8)。S3 は 15:00 (14:30 終値 78,278 < ref)、S1/S2 は出ない。"""
+    doc = recorded(scene.id)
+    _, _, _, res = recorded_series(doc, scene, CFG.delta_method, True)
     scene_ts = set(doc["scene_open_utc_ms"])
-    assert not (scene_ts & set(res.accept_events)), "S2 では受け入れ警告なし (23:30 の高値はヒゲのみ)"
+    inside = {t: e for t, e in res.accept_events.items() if t in scene_ts}
+    if scene.accept_warning_label is None:
+        assert not inside, f"{scene.id}: 受け入れ警告なしのはず: {inside}"
+    else:
+        t = paris_to_ms(scene.accept_warning_label)
+        assert inside.get(t) == scene.mode, f"{scene.id}: {scene.accept_warning_label} に受け入れ警告が無い: {inside}"
 
 
 def test_recorded_negative_0828_no_fire_L(recorded):
     doc = recorded("NEG_0828")
     bars15 = klines.parse_klines(doc["klines_15m"])
-    ds = klines.deltas(bars15, "taker")
+    ds = klines.deltas(bars15, CFG.delta_method, klines.parse_klines(doc.get("klines_1m", [])))
     atrs = atrmod.atr_series(bars15, CFG.atr_len)
     meds = [klines.volume_median(bars15[: i + 1], CFG.vol_median_len) for i in range(len(bars15))]
-    wbs = [WindowBar(t=b.t, h=b.h, l=b.l, c=b.c, v=b.v, delta=d) for b, d in zip(bars15, ds)]
+    wbs = [WindowBar(t=b.t, h=b.h, l=b.l, c=b.c, v=b.v, delta=(d if d is not None else 0.0)) for b, d in zip(bars15, ds)]
     res = evaluate_series(wbs, atrs, meds, CFG, "L", 0, 0, floor_enabled=False)
+    assert ds[bars15.index(next(b for b in bars15 if b.t == paris_to_ms(cal.NEGATIVE_0828["window_label"]) - 2 * 900_000))] is not None, "03:15 窓の 1 分足が無い"
     t = paris_to_ms(cal.NEGATIVE_0828["window_label"])
     d = {x.t: x for x in res.diagnoses}[t]
     assert d.verdict != "fire", "スパイク直後に成立L を出してはいけない ((d) が δ 符号で不成立)"

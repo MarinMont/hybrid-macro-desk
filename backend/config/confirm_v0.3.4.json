@@ -1,0 +1,13 @@
+{
+  "version": "v0.3.4",
+  "timeframe": "15m",
+  "window_bars": 3,
+  "x_ratio": 0.05,
+  "atr_coef": 0.75,
+  "atr_len": 14,
+  "vol_floor_mult": 3.0,
+  "vol_median_len": 96,
+  "accept_consecutive": 2,
+  "delta_method": "reconstruct",
+  "note": "閾値は v0.3.3 と同一。delta_method のみ reconstruct (TradingView の Pine v0.3.3 と同一の δ)。校正場面 S2/S3 の δ と単位まで一致することを確認 (2026-09-08)。"
+}

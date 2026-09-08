@@ -12,7 +12,8 @@
 - 「GO but WAIT」拒否権注記、サンプルタグ、カバー率表示、フッター免責 — これらは思想の一部
 - ダッシュボードの Entry Engine パネルは表示のみ (entry_state.json を読む)。判定ロジックをパネル側へ持ち込まない
 - セットアップコンソールの校正値 (x_ratio 0.05 / atr_coef 0.75 / vol_floor ×3 / median 96本 / accept 2本)。
-  `backend/config/confirm_v0.3.3.json` は**上書き禁止**。変更は新バージョンのファイル追加 + UI のバージョン表示更新のみ。
+  `backend/config/confirm_v0.3.3.json` / `confirm_v0.3.4.json` は**上書き禁止**。変更は新バージョンのファイル追加 + UI のバージョン表示更新のみ。
+  既定は v0.3.4 (閾値は v0.3.3 と同一、δ は reconstruct = TradingView の Pine と同一。taker は校正を再現しない)。
   テストが通らないときは実装を疑い、閾値を疑わない
 - HLレート自主上限 600weight/分 (liqmap_service.py の WeightBucket)
 - **発注・約定・ポジション操作のコードを書かない** (取引権限のあるキーを持たない)
@@ -33,6 +34,8 @@ handoff/    SPEC.md / API_DESIGN.md (ダッシュボード仕様) / SETUP_CONSOL
 2. ENTRY_CONSOLE_SPEC v0.1 (entry_state.json を書く Entry Console) は**破棄**。セットアップコンソールが後継
 3. §8 の出来高床は**実データ (記録済み Binance klines) から median を計算**して検証する
 4. 台帳の永続化先は **backend の JSON ファイル** (アトミック書き込み)
+5. δ の正は **reconstruct** (2026-09-08)。校正場面 S2/S3 の δ が Pine の再構成と単位まで一致し、指示書 §2.4 の既定 taker は S3 の (c)棄却を再現しないため。
+   S1 の校正 δ は別ソース由来で再現不能 → 実データ検証は ATR のみ
 
 ## コーディング規約
 - Python: 3.11+、型ヒント必須、async httpx、外部呼び出しは必ず timeout + try/except。

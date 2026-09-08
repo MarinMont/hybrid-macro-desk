@@ -73,7 +73,7 @@ Deribit満期の自前計算 / Anthropic API（AI概況・カレンダー注釈�
 人間のルールで算術を検算し、POI到達時に吸収コンファーム (Pine v0.3.3 移植) を機械判定し、台帳に記録する。
 緑のランプは「入れ」ではなく「消さなくてよい」。
 
-- 校正値: `backend/config/confirm_v0.3.3.json` (上書き禁止。変更は新ファイル追加)
+- 校正値: `backend/config/confirm_v0.3.4.json` が既定 (閾値は v0.3.3 と同一、δ は `reconstruct` = TradingView の Pine と同一)。既存ファイルは上書き禁止、変更は新ファイル追加
 - 台帳/フロー/履歴: `backend/data/*.json` (`SETUP_CONSOLE_DATA_DIR` で変更可)
 - 校正場面の実データ記録 (Mac で実行): `cd backend && python -m setup_console.record_calibration`
   → `backend/tests/fixtures/calibration/` に klines を保存し、床 median / taker Σδ / ATR / 終値の検証テストが有効になる
@@ -94,11 +94,13 @@ Deribit満期の自前計算 / Anthropic API（AI概況・カレンダー注釈�
 7. L01 `born_on` "2026-05" は月のみ (暫定で 2026-05-01 を保持し、表示は「2026-05」)
 
 仕様の確認:
-8. §5.3 受け入れ警告の検証に終値が必要 — フィクスチャに C 列が無いため、記録済み実データで検証する方式を採用
+8. §5.3 受け入れ警告: Binance 終値で検証した結果、S3 は **15:00 確定**で点灯 (14:30 終値 78,278 < 78,396.9)。指示書の「14:45」は Binance 終値と合わない
 9. §4 週末ATR「直近フル流動性セッション」の定義 (暫定: 直近の平日 (月〜金 Europe/Paris) 最終確定 1H 足時点の ATR を参考表示)
 10. §2.2 台帳 `ts_local` は足の開始時刻で記録し、確定時刻を併記 (暫定)
 11. §7 月末最終営業日の「営業日」は US 営業日 (土日 + `calendar.json` の休場日を除く) と暫定解釈
 12. §9 CSV の列順: Google Sheet「POI水準台帳 v3」C表の列順が不明 — Touch モデルのフィールド順で暫定出力
+13. **S1 の校正 δ の出所**: Pine (reconstruct) でも Binance taker でも再現できない (14:45 が校正 +457 に対し Pine 再構成 −1377)。
+    S2/S3 は Pine と単位まで一致。出所が分かるまで S1 の実データ検証は ATR のみ (`recorded_delta_check=False`)
 
 ## 免責
 

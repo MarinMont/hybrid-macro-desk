@@ -46,10 +46,15 @@ def replay(
     # (mode, ref) の組ごとに系列評価をキャッシュ
     cache: dict[tuple[str, float], object] = {}
 
+    ok = [d is not None for d in ds]
+    valid = {bars[i].t for i in range(len(bars)) if i >= 2 and all(ok[i - 2:i + 1])}
+
     def series_for(mode: str, ref: float):
         key = (mode, ref)
         if key not in cache:
-            cache[key] = evaluate_series(wbs, atrs, meds, cfg, mode, ref if mode == "S" else 0.0, ref if mode == "L" else 0.0, floor_enabled)
+            res = evaluate_series(wbs, atrs, meds, cfg, mode, ref if mode == "S" else 0.0, ref if mode == "L" else 0.0, floor_enabled)
+            res.diagnoses[:] = [d for d in res.diagnoses if d.t in valid]   # 1 分足の無い窓は判定しない
+            cache[key] = res
         return cache[key]
 
     rows: list[dict] = []

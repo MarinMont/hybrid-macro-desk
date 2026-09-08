@@ -35,6 +35,8 @@ class Scene:
     # 窓 (label = 最新確定足) → 期待判定 "fire" | "rejected_c" | "silent"
     expected: dict
     note: str = ""
+    recorded_delta_check: bool = True          # 記録済み実データで Σδ ±30% / 床有効の判定を検証するか
+    accept_warning_label: str | None = None    # 受け入れ警告が出る足 (open, Paris)。None = 出ない
 
 
 S1 = Scene(
@@ -53,7 +55,8 @@ S1 = Scene(
         "2026-09-04 15:30": "fire",
         "2026-09-04 15:45": "fire",
     },
-    note="ロング側・成功。出来高床は無効化して判定",
+    note="ロング側・成功。出来高床は無効化して判定。校正 δ は Pine (reconstruct) でも Binance taker でも再現できない別ソース (README 未回答事項 13) → 実データ検証は ATR のみ",
+    recorded_delta_check=False,
 )
 
 S2 = Scene(
@@ -91,11 +94,14 @@ S3 = Scene(
         "2026-09-03 15:00": "silent",
         "2026-09-03 15:15": "rejected_c",
     },
-    note="ショート側・失敗 = 偽陽性を (c) が弾く。14:45 確定で受け入れ警告 (終値は実データで検証)",
+    note="ショート側・失敗 = 偽陽性を (c) が弾く。受け入れ警告は Binance 終値では 15:00 確定 (14:30 終値 78,278 < ref)",
+    accept_warning_label="2026-09-03 15:00",
 )
 
 SCENES = {s.id: s for s in (S1, S2, S3)}
 
+# 校正 δ の出所 (2026-09-08 実データ突き合わせ): S2/S3 は Pine v0.3.3 (reconstruct) と単位まで一致。
+# S1 は別ソース由来で再現不能 → 既定の delta_method は reconstruct (config v0.3.4)。
 # 追加の否定テスト: 8/28 03:15 CEST の天井直後 (mode=L)。スパイク足の δ が正のため (d) 不成立。
 # フィクスチャ表は無く、記録済み実データでのみ検証する。
 NEGATIVE_0828 = {"id": "NEG_0828", "mode": "L", "window_label": "2026-08-28 03:15", "note": "スパイク直後の成立L を出さない"}

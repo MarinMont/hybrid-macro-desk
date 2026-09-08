@@ -4,6 +4,11 @@
 > 3. §8 出来高床: 記録済み Binance 実データ (`backend/tests/fixtures/calibration/`) から median を計算して検証
 > 4. 台帳の永続化: `backend/data/*.json` (アトミック書き込み)
 > 5. §12 §3.2 の「要記入」「要確認」および技術的確認事項は未回答 → 該当水準は inactive 扱い。回答待ちリストは README の「未回答事項」を参照
+> 6. **δ の正は `reconstruct`** (2026-09-08、実データ突き合わせ後にオーナー承認)。§2.4 の「既定 taker」は採用しない。
+>    根拠: S2/S3 の校正 δ は Pine v0.3.3 (= reconstruct) と単位まで一致、taker は S3 15:15 の (c)棄却を再現しない (ratio 0.012 で沈黙)。
+>    `config/confirm_v0.3.4.json` (閾値は v0.3.3 と同一、delta_method のみ変更) を既定にした。§2.4 の「両方式が ±30%」は reconstruct のみに適用。
+> 7. §8 S3 の受け入れ警告は Binance 終値では **15:00 確定** (14:30 終値 78,278 < 78,396.9)。§8 の「14:45」ではなく実データを正とする (§8 自身の指示に従う)。
+> 8. §8 S1 の校正 δ は Pine でも taker でも再現できない別ソース由来 → 出所が判明するまで S1 の実データ検証は ATR のみ。
 >
 > 本リポジトリに存在しないもの (§12「Backtester / Grid Control Tower」、§10「他ページ」「frontend-design 規約」) は無視する。
 

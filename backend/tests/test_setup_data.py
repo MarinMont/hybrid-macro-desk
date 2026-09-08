@@ -129,6 +129,15 @@ def test_confirm_v033_values_are_canonical():
     assert "v0.3.3" in config.list_versions()
 
 
+def test_confirm_v034_same_thresholds_reconstruct_and_default():
+    a, b = config.load_config("v0.3.3"), config.load_config("v0.3.4")
+    da, db = a.to_dict(), b.to_dict()
+    for k in ("timeframe", "window_bars", "x_ratio", "atr_coef", "atr_len", "vol_floor_mult", "vol_median_len", "accept_consecutive"):
+        assert da[k] == db[k], k
+    assert b.delta_method == "reconstruct"
+    assert config.load_config().version == "v0.3.4"
+
+
 def test_config_rejects_other_timeframe(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "CONFIG_DIR", tmp_path)
     bad = {"version": "vX", "timeframe": "1h", "window_bars": 3, "x_ratio": 0.05, "atr_coef": 0.75, "atr_len": 14,

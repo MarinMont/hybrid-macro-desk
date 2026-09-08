@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 CONFIG_DIR = Path(os.getenv("SETUP_CONSOLE_CONFIG_DIR", Path(__file__).resolve().parent.parent / "config"))
-DEFAULT_VERSION = os.getenv("SETUP_CONSOLE_CONFIRM_VERSION", "v0.3.3")
+DEFAULT_VERSION = os.getenv("SETUP_CONSOLE_CONFIRM_VERSION", "v0.3.4")  # v0.3.3 と同閾値、δ は reconstruct (Pine と同一)
 
 REQUIRED_KEYS = (
     "version", "timeframe", "window_bars", "x_ratio", "atr_coef", "atr_len",
