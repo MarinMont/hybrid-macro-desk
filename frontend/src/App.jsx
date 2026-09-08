@@ -81,9 +81,10 @@ const adaptEntryState = (j) => {
     direction: j.direction ?? null,
     sinceMin,
     pillars: [
-      { name: "価格構造", ok: !!p.structure?.ok, value: p.structure?.value ?? "" },
-      { name: "CVD", ok: !!p.cvd?.ok, value: p.cvd?.value ?? "" },
-      { name: "OI", ok: !!p.oi?.ok, value: p.oi?.value ?? "" },
+      // 柱の名前は entry_state.json に name があればそれを使う (セットアップコンソール連携。既定は従来の3本柱)
+      { name: p.structure?.name ?? "価格構造", ok: !!p.structure?.ok, value: p.structure?.value ?? "" },
+      { name: p.cvd?.name ?? "CVD", ok: !!p.cvd?.ok, value: p.cvd?.value ?? "" },
+      { name: p.oi?.name ?? "OI", ok: !!p.oi?.ok, value: p.oi?.value ?? "" },
     ],
     nextCondition: j.next_condition ?? "",
     regime: j.regime,
@@ -1126,7 +1127,7 @@ export default function HybridMacroDeskBTC() {
                           <div className="w-5 text-center font-bold" style={{ color: p.ok ? C.green : C.red, fontFamily: FONT_MONO }}>
                             {p.ok ? "✓" : "✗"}
                           </div>
-                          <div className="w-20 text-sm font-semibold" style={{ color: C.text }}>{p.name}</div>
+                          <div className="w-28 text-sm font-semibold" style={{ color: C.text }}>{p.name}</div>
                           <div className="flex-1 text-xs" style={{ color: C.muted, fontFamily: FONT_MONO }}>{p.value}</div>
                         </div>
                       ))}

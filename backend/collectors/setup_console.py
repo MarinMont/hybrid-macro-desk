@@ -17,12 +17,13 @@ import asyncio
 import logging
 import os
 import time
+from pathlib import Path
 from dataclasses import asdict
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from setup_console import atr as atrmod, calendar_gate as cg, flow as F, klines, ledger as LG, replay as RP
+from setup_console import atr as atrmod, calendar_gate as cg, entry_bridge as EB, flow as F, klines, ledger as LG, replay as RP
 from setup_console.arithmetic import ArithInput, EntryLeg, check as arith_check
 from setup_console.config import DEFAULT_VERSION, list_versions, load_config
 from setup_console.confirm import ACCEPT_TEXT, WindowBar, diagnosis_rows, evaluate_series, judge
@@ -42,6 +43,7 @@ LIMIT_1H = 200
 HISTORY_MAX = 2000
 STALE_SEC = 90
 
+WRITE_ENTRY_STATE = os.getenv("SETUP_WRITE_ENTRY_STATE", "1") == "1"   # ダッシュボードの Entry Engine へ写す
 INPUTS_FILE = "inputs.json"
 HISTORY_FILE = "history.json"
 DEFAULT_INPUTS = {"mode": "both", "ref_s": 0.0, "ref_l": 0.0, "zone_lo": 0.0, "zone_hi": 0.0, "use_zone": False}
@@ -254,6 +256,42 @@ def _evaluate(now_ms: int) -> None:
         LG.save_ledger(lg)
     if flow_changed:
         F.save_flow(flow)
+    _write_entry_state(now_ms, flow=flow, lg=lg)
+
+
+def _dashboard_candles() -> list[dict]:
+    """ダッシュボードの HL 1h 足 (collectors/market のキャッシュ)。regime の簡易判定に使う。"""
+    try:
+        from collectors import market as mk
+        return list(mk._cache.get("candles") or [])
+    except Exception:  # noqa: BLE001
+        return []
+
+
+_last_entry_state: dict | None = None
+
+
+def _write_entry_state(now_ms: int, flow: F.FlowState | None = None, lg: LG.Ledger | None = None) -> None:
+    """コンソールの状態を entry_state.json (SPEC §7) に写す。/api/entry-state が読む場所 (ENTRY_STATE_PATH) と同じ。"""
+    global _last_entry_state
+    if not WRITE_ENTRY_STATE:
+        return
+    try:
+        flow = flow or F.load_flow()
+        lg = lg or LG.load_ledger()
+        bars15 = _st["bars15"]
+        price = bars15[-1].c if bars15 else None
+        latest = _st["latest"]
+        atr15 = latest.atr if latest else None
+        view = _ledger_view(lg, price, atr15, paris_date(now_ms))["bands"]
+        doc = EB.build_entry_state(flow, latest, lg, price, atr15, _dashboard_candles(), now_ms, view)
+        cmp_doc = {k: v for k, v in doc.items() if k != "console"}
+        if cmp_doc == _last_entry_state:
+            return
+        _last_entry_state = cmp_doc
+        write_json_atomic(Path(os.getenv("ENTRY_STATE_PATH", "entry_state.json")), doc)
+    except Exception as e:  # noqa: BLE001
+        log.warning("entry_state.json write failed: %s", e)
 
 
 # ---------------- GET /api/setup/state ----------------
@@ -396,6 +434,7 @@ class AdvanceBody(BaseModel):
     side: str | None = None
     sl: float | None = None
     avg_entry: float | None = None
+    tp: float | None = None
 
 
 @router.post("/api/setup/flow/advance")
@@ -408,10 +447,11 @@ async def flow_advance(body: AdvanceBody):
         fs = F.load_flow()
         try:
             fs = F.advance(fs, body.to, now_ms, body.note, arith_ok=body.arith_ok, gate_open=gate["placement_allowed"],
-                           band_id=body.band_id, side=body.side, sl=body.sl, avg_entry=body.avg_entry, atr_1h=atr1h)
+                           band_id=body.band_id, side=body.side, sl=body.sl, avg_entry=body.avg_entry, atr_1h=atr1h, tp=body.tp)
         except F.TransitionError as e:
             raise HTTPException(400, str(e))
         F.save_flow(fs)
+        _write_entry_state(now_ms, flow=fs)
     return fs.to_dict()
 
 

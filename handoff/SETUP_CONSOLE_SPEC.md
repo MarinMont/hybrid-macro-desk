@@ -8,7 +8,9 @@
 >    根拠: S2/S3 の校正 δ は Pine v0.3.3 (= reconstruct) と単位まで一致、taker は S3 15:15 の (c)棄却を再現しない (ratio 0.012 で沈黙)。
 >    `config/confirm_v0.3.4.json` (閾値は v0.3.3 と同一、delta_method のみ変更) を既定にした。§2.4 の「両方式が ±30%」は reconstruct のみに適用。
 > 7. §8 S3 の受け入れ警告は Binance 終値では **15:00 確定** (14:30 終値 78,278 < 78,396.9)。§8 の「14:45」ではなく実データを正とする (§8 自身の指示に従う)。
-> 8. §8 S1 の校正 δ は Pine でも taker でも再現できない別ソース由来 → 出所が判明するまで S1 の実データ検証は ATR のみ。
+> 8. §8 S1 の校正 δ は TradingView フットプリント (ティックルール分類) から転記 (2026-09-08 回答)。Pine とも taker とも定義が異なり kline から再現不能 → S1 の実データ検証は ATR のみ。
+> 9. §6「旧エンジンは残す」の解釈 (2026-09-08): ダッシュボードの Entry Engine パネルは残し、コンソールが `entry_state.json` (旧スキーマ) を書いて
+>    パネルに実状態を映す (`setup_console/entry_bridge.py`)。写像のみで新たな判定はしない。3本柱の名前は entry_state.json 側で上書き。
 >
 > 本リポジトリに存在しないもの (§12「Backtester / Grid Control Tower」、§10「他ページ」「frontend-design 規約」) は無視する。
 

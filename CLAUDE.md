@@ -10,7 +10,8 @@
   例外: セットアップコンソール画面 (`frontend/src/SetupConsole.jsx`) は SETUP_CONSOLE_SPEC §10 の判定色
   (成立=青緑 / (c)棄却=橙 / 受け入れ警告=紫 / 違反=赤 / 沈黙=灰) を持つ。**緑を「入れ」の意味で使わない。**
 - 「GO but WAIT」拒否権注記、サンプルタグ、カバー率表示、フッター免責 — これらは思想の一部
-- ダッシュボードの Entry Engine パネルは表示のみ (entry_state.json を読む)。判定ロジックをパネル側へ持ち込まない
+- ダッシュボードの Entry Engine パネルは表示のみ (entry_state.json を読む)。判定ロジックをパネル側へ持ち込まない。
+  entry_state.json はセットアップコンソールが `setup_console/entry_bridge.py` で**写像するだけ** (そこで新たな判定をしない)
 - セットアップコンソールの校正値 (x_ratio 0.05 / atr_coef 0.75 / vol_floor ×3 / median 96本 / accept 2本)。
   `backend/config/confirm_v0.3.3.json` / `confirm_v0.3.4.json` は**上書き禁止**。変更は新バージョンのファイル追加 + UI のバージョン表示更新のみ。
   既定は v0.3.4 (閾値は v0.3.3 と同一、δ は reconstruct = TradingView の Pine と同一。taker は校正を再現しない)。
@@ -34,6 +35,7 @@ handoff/    SPEC.md / API_DESIGN.md (ダッシュボード仕様) / SETUP_CONSOL
 2. ENTRY_CONSOLE_SPEC v0.1 (entry_state.json を書く Entry Console) は**破棄**。セットアップコンソールが後継
 3. §8 の出来高床は**実データ (記録済み Binance klines) から median を計算**して検証する
 4. 台帳の永続化先は **backend の JSON ファイル** (アトミック書き込み)
+6. Entry Engine パネルへの反映は entry_state.json 経由 (2026-09-08)。コンソールの状態機械をパネルの語彙に写像する (entry_bridge.py)
 5. δ の正は **reconstruct** (2026-09-08)。校正場面 S2/S3 の δ が Pine の再構成と単位まで一致し、指示書 §2.4 の既定 taker は S3 の (c)棄却を再現しないため。
    S1 の校正 δ は別ソース由来で再現不能 → 実データ検証は ATR のみ
 

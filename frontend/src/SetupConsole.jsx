@@ -250,7 +250,7 @@ const ArithPane = ({ s, onResult }) => {
     const r = await jpost("/api/setup/arith", body);
     if (!r) { setErr("検算できない (入力不足かバックエンド不達)"); setRes(null); onResult(null); return; }
     setRes(r);
-    onResult({ ok: !r.placement_blocked, band_id: f.band_id, side: f.side, sl: num(f.sl), avg_entry: r.avg_entry });
+    onResult({ ok: !r.placement_blocked, band_id: f.band_id, side: f.side, sl: num(f.sl), avg_entry: r.avg_entry, tp: num(f.tp) });
   };
   const wk = s?.weekend_or_holiday;
   return (
@@ -321,7 +321,7 @@ const FlowPane = ({ s, arith, refresh }) => {
     setErr(null); setBusy(true);
     const body = { to, note };
     if (fl.state === "IDLE" && to === "PLACED") {
-      Object.assign(body, { arith_ok: !!arith?.ok, band_id: arith?.band_id || null, side: arith?.side || null, sl: arith?.sl ?? null, avg_entry: arith?.avg_entry ?? null });
+      Object.assign(body, { arith_ok: !!arith?.ok, band_id: arith?.band_id || null, side: arith?.side || null, sl: arith?.sl ?? null, avg_entry: arith?.avg_entry ?? null, tp: arith?.tp ?? null });
     }
     const r = await jpost("/api/setup/flow/advance", body);
     setBusy(false);
@@ -342,7 +342,7 @@ const FlowPane = ({ s, arith, refresh }) => {
       <div className="rounded-lg px-3 py-2 mb-3" style={{ background: C.panelSoft, border: `1px solid ${C.border}` }}>
         <div className="text-xs" style={{ color: C.faint }}>いま人間がやること</div>
         <div className="text-sm font-semibold" style={{ color: C.text, fontFamily: FONT_UI }}>{fl.todo}</div>
-        {fl.band_id && <div className="text-xs mt-1" style={{ color: C.muted, fontFamily: FONT_MONO }}>帯 {fl.band_id} · {fl.side} · SL <span style={{ color: C.text }}>{fmt(fl.sl, 0)}</span> (固定・変更不可) · 建値 {fmt(fl.avg_entry, 1)}</div>}
+        {fl.band_id && <div className="text-xs mt-1" style={{ color: C.muted, fontFamily: FONT_MONO }}>帯 {fl.band_id} · {fl.side} · SL <span style={{ color: C.text }}>{fmt(fl.sl, 0)}</span> (固定・変更不可) · 建値 {fmt(fl.avg_entry, 1)} · TP {fmt(fl.tp, 0)}</div>}
         {fl.state === "FILLED_UNCONFIRMED" && <div className="text-xs mt-1" style={{ color: C.muted }}>約定後の確定窓 {fl.windows_since_fill} / 4 (4窓で成立も棄却もなければ時間スクラッチ)</div>}
         {fl.exit_plan && (
           <div className="text-xs mt-1" style={{ color: K.accept, fontFamily: FONT_MONO }}>

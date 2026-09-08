@@ -80,6 +80,7 @@ class FlowState:
     side: str | None = None
     sl: float | None = None              # PLACED 時に固定 (変更不可)
     avg_entry: float | None = None
+    tp: float | None = None              # 利確目標 (ダッシュボードの setup 表示用)
     windows_since_fill: int = 0          # FILLED_UNCONFIRMED 以降に評価した確定窓の数
     last_verdict: str | None = None
     exit_plan: dict | None = None        # {price_upper, price_lower, timer_end_utc}
@@ -120,7 +121,7 @@ def _enter(fs: FlowState, to: str, now_ms: int, who: str, note: str) -> FlowStat
     fs.since_utc = now_ms
     fs.suggested = None
     if to == "IDLE":
-        fs.band_id = fs.side = fs.sl = fs.avg_entry = None
+        fs.band_id = fs.side = fs.sl = fs.avg_entry = fs.tp = None
         fs.windows_since_fill = 0
         fs.last_verdict = None
         fs.exit_plan = None
@@ -133,7 +134,7 @@ def advance(
     fs: FlowState, to: str, now_ms: int, note: str = "", *,
     arith_ok: bool | None = None, gate_open: bool | None = None,
     band_id: str | None = None, side: str | None = None, sl: float | None = None, avg_entry: float | None = None,
-    atr_1h: float | None = None,
+    atr_1h: float | None = None, tp: float | None = None,
 ) -> FlowState:
     """人間のチェック操作。許可された遷移のみ。IDLE→PLACED は算術OK かつ ゲート開 が条件。"""
     if to not in STATES:
@@ -148,7 +149,7 @@ def advance(
             raise TransitionError("カレンダーゲートが閉じている (敷設不可)")
         if not band_id or side not in ("S", "L") or sl is None:
             raise TransitionError("帯・方向・SL を指定する")
-        fs.band_id, fs.side, fs.sl, fs.avg_entry = band_id, side, sl, avg_entry
+        fs.band_id, fs.side, fs.sl, fs.avg_entry, fs.tp = band_id, side, sl, avg_entry, tp
     if to == "EXIT_PLAN":
         fs.exit_plan = make_exit_plan(fs.avg_entry, atr_1h, now_ms)
     return _enter(fs, to, now_ms, "human", note)

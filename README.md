@@ -82,6 +82,11 @@ Deribit満期の自前計算 / Anthropic API（AI概況・カレンダー注釈�
   下段: カレンダーゲート 72h / 判定履歴 / 到達記録 (結果は人間が記入) / リプレイ (期間指定 → Touch 行 + CSV)
 - API: `GET /api/setup/state` (15s 毎に画面が読む集約) / `POST /api/setup/{inputs,arith,flow/advance,ledger/level,ledger/band,ledger/touch,calendar/event,calendar/holiday,replay}`
 - 各遷移は人間のチェック操作。自動は「価格が帯に到達」「約定後 4 窓で成立も棄却もなし → EXIT_PLAN」のみ
+- **ダッシュボードの Entry Engine パネルへの反映**: コンソールは判定・フロー更新のたびに `entry_state.json` (SPEC §7 スキーマ) を
+  `ENTRY_STATE_PATH` (既定 `backend/entry_state.json`) に書き、同じバックエンドの `/api/entry-state` が読む。
+  写像: IDLE/REJECTED/CLOSED→IDLE、PLACED/PULLED_*→ARMED、AT_POI→PULLBACK、CONFIRMED/FILLED/MANAGE/EXIT_PLAN→TRIGGERED。
+  3本柱は「帯・水準 / 吸収 (a·d) / 前進÷ATR (b·c)」に名前ごと置き換わる。setup (建値/SL/TP) は敷設後に指定値として渡る。
+  regime はコンソールが判定しないため、ダッシュボードと同じ簡易判定 (SPEC §4 Bearing) を写し確信度は 0。`SETUP_WRITE_ENTRY_STATE=0` で停止
 
 ### 未回答事項 (仕様 §12: 推測で埋めない。回答があるまで該当水準は inactive)
 台帳の値:
@@ -104,6 +109,8 @@ Deribit満期の自前計算 / Anthropic API（AI概況・カレンダー注釈�
     → S1 は「別定義の δ で校正された場面」として実データ検証は ATR のみ (`recorded_delta_check=False`)。
     Pine (reconstruct) で S1 を流すと 15:00 成立 / **15:15 成立** / 15:30 成立 / **15:45 沈黙** になる (校正シートは 15:15 沈黙・15:45 成立)。
     TradingView 上の Pine が 9/4 15:15・15:45 CEST に何を出していたかをオーナーが確認すれば、S1 の期待値を Pine 基準に更新できる
+14. **Regime パネルの確信度**: コンソールはレジームを判定しない。entry_state.json にはダッシュボードと同じ簡易判定 (Bearing) を写し、
+    `regime_confidence` は未算出のため 0。算出式を決めるならオーナー判断 (閾値の新設になる)
 
 ## 免責
 

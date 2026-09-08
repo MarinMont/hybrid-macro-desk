@@ -6,6 +6,7 @@ Binance はフェイク klines でモック。データ置き場は tmp。時刻
 from __future__ import annotations
 
 import asyncio
+import json
 
 import pytest
 from fastapi import FastAPI
@@ -200,3 +201,21 @@ def test_replay_endpoint(env):
     assert l01 and l01[0]["ts_local"] == "2026-09-07 15:00" and len(l01[0]["path_16_close"]) == 16
     assert env.post("/api/setup/replay", json={"from_local": "2026-09-08 00:00", "to_local": "2026-09-07 00:00"}).status_code == 400
     assert env.post("/api/setup/replay", json={"from_local": "bad", "to_local": "2026-09-07 00:00"}).status_code == 400
+
+
+def test_entry_state_json_is_written_for_dashboard(env, tmp_path, monkeypatch):
+    p = tmp_path / "entry_state.json"
+    monkeypatch.setenv("ENTRY_STATE_PATH", str(p))
+    monkeypatch.setattr(sc, "_last_entry_state", None)
+    asyncio.run(_poll(FakeHTTP()))
+    assert p.exists()
+    j = json.loads(p.read_text(encoding="utf-8"))
+    assert j["state"] == "IDLE" and set(j["pillars"]) == {"structure", "cvd", "oi"} and j["regime"] in ("uptrend", "range", "downtrend")
+    assert j["pillars"]["cvd"]["name"] == "吸収 (a·d)"
+    # フロー遷移で即時に書き換わる
+    env.post("/api/setup/flow/advance", json={"to": "PLACED", "arith_ok": True, "band_id": "L01", "side": "S", "sl": 83500, "avg_entry": 81900, "tp": 77450})
+    j = json.loads(p.read_text(encoding="utf-8"))
+    assert j["state"] == "ARMED" and j["direction"] == "SHORT" and j["setup"]["targets"] == [77450]
+    # 同じバックエンドの /api/entry-state が読める形
+    from collectors import entry_state as es
+    assert asyncio.run(es.entry_state())["state"] == "ARMED"
