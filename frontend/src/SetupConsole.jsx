@@ -47,6 +47,12 @@ const Btn = ({ children, color = C.orangeBright, dim = C.orangeDim, ...props }) 
   </button>
 );
 
+// 台帳テーブルのセル (折り返さない・余白)
+const Td = ({ children, center, style = {}, ...rest }) => (
+  <td className={`py-1 px-1.5 whitespace-nowrap ${center ? "text-center" : ""}`} style={style} {...rest}>{children}</td>
+);
+const Th = ({ children, left }) => <th className={`px-1.5 whitespace-nowrap ${left ? "text-left" : ""}`}>{children}</th>;
+
 const Pending = ({ fields }) =>
   fields?.length ? <span className="text-xs font-bold" style={{ color: K.violation }}>{fields.join("/")} 要記入</span> : null;
 
@@ -66,24 +72,24 @@ const LedgerPane = ({ s, refresh }) => {
     setBusy(false);
     if (r?.ok) { setEdit(null); refresh(); }
   };
-  const distText = (d) => d?.usd == null ? "—" : `${signed(d.usd)} (${d.atr == null ? "—" : signed(d.atr, 2)}×15m ATR)`;
+  const distText = (d) => d?.usd == null ? "—" : `${signed(d.usd)} / ${d.atr == null ? "—" : signed(d.atr, 1)}ATR`;
   return (
     <Panel title="① 台帳 ＆ 帯" right={<Small>現在値 {fmt(price, 0)}</Small>}>
       <div className="text-xs mb-2" style={{ color: C.faint }}>帯 (暫定・編集可)。要記入/要確認は赤字、人間が埋めるまで inactive</div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs" style={{ fontFamily: FONT_MONO }}>
-          <thead><tr style={{ color: C.faint }}><th className="text-left">帯</th><th>側</th><th>lo–hi</th><th>ref (c)</th><th>SL</th><th>有効</th><th>距離</th><th></th></tr></thead>
+          <thead><tr style={{ color: C.faint }}><Th left>帯</Th><Th>側</Th><Th>lo–hi</Th><Th>ref (c)</Th><Th>SL</Th><Th>有効</Th><Th>距離</Th><Th></Th></tr></thead>
           <tbody>
             {(s?.ledger?.bands || []).map((b) => (
               <tr key={b.id} style={{ borderTop: `1px solid ${C.borderSoft}`, color: b.active ? C.text : C.faint }}>
-                <td className="py-1 font-bold">{b.id}</td>
-                <td className="text-center">{b.side}</td>
-                <td className="text-center">{fmt(b.lo, 0)}–{fmt(b.hi, 0)}</td>
-                <td className="text-center">{b.ref_level == null ? <span style={{ color: K.violation }}>要記入</span> : fmt(b.ref_level, 1)}</td>
-                <td className="text-center">{b.sl_price == null ? <span style={{ color: K.violation }}>要記入</span> : fmt(b.sl_price, 0)}</td>
-                <td className="text-center">{b.active ? b.valid_from : <span style={{ color: b.pending.length ? K.violation : C.yellow }}>{b.pending.length ? "inactive" : b.valid_from ? "未誕生" : "構成水準が未確定"}</span>}</td>
-                <td className="text-center">{distText(b.distance)}</td>
-                <td><button className="underline" style={{ color: C.muted }} onClick={() => setEdit({ type: "band", obj: { ...b } })}>編集</button></td>
+                <Td style={{ fontWeight: 700 }}>{b.id}</Td>
+                <Td center>{b.side}</Td>
+                <Td center>{fmt(b.lo, 0)}–{fmt(b.hi, 0)}</Td>
+                <Td center>{b.ref_level == null ? <span style={{ color: K.violation }}>要記入</span> : fmt(b.ref_level, 1)}</Td>
+                <Td center>{b.sl_price == null ? <span style={{ color: K.violation }}>要記入</span> : fmt(b.sl_price, 0)}</Td>
+                <Td center>{b.active ? b.valid_from : <span style={{ color: b.pending.length ? K.violation : C.yellow }}>{b.pending.length ? "inactive" : b.valid_from ? "未誕生" : "構成未確定"}</span>}</Td>
+                <Td center>{distText(b.distance)}</Td>
+                <Td><button className="underline" style={{ color: C.muted }} onClick={() => setEdit({ type: "band", obj: { ...b } })}>編集</button></Td>
               </tr>
             ))}
           </tbody>
@@ -92,21 +98,21 @@ const LedgerPane = ({ s, refresh }) => {
       <div className="text-xs mt-3 mb-1" style={{ color: C.faint }}>水準 (2026-08-17 以降、75,000〜83,000、日足フレーム)</div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs" style={{ fontFamily: FONT_MONO }}>
-          <thead><tr style={{ color: C.faint }}><th className="text-left">id</th><th>価格</th><th className="text-left">名称</th><th>層</th><th>born</th><th>valid_from</th><th>距離</th><th></th></tr></thead>
+          <thead><tr style={{ color: C.faint }}><Th left>id</Th><Th>価格</Th><Th left>名称</Th><Th>層</Th><Th>born</Th><Th>valid_from</Th><Th>距離</Th><Th></Th></tr></thead>
           <tbody>
             {(s?.ledger?.levels || []).map((l) => (
               <tr key={l.id} style={{ borderTop: `1px solid ${C.borderSoft}`, color: l.active ? C.text : C.faint }}>
-                <td className="py-1 font-bold">{l.id}</td>
-                <td className="text-center">{fmt(l.price, 1)}</td>
-                <td>{l.name} {l.status !== "active" && <Tag color={C.faint}>{l.status}</Tag>}</td>
-                <td className="text-center">{l.tier}</td>
-                <td className="text-center">{l.born_on ?? <span style={{ color: K.violation }}>要記入</span>}</td>
-                <td className="text-center">
+                <Td style={{ fontWeight: 700 }}>{l.id}</Td>
+                <Td center>{fmt(l.price, 1)}</Td>
+                <Td>{l.name} {l.status !== "active" && <Tag color={C.faint}>{l.status}</Tag>}</Td>
+                <Td center>{l.tier}</Td>
+                <Td center>{l.born_on ?? <span style={{ color: K.violation }}>要記入</span>}</Td>
+                <Td center>
                   {l.valid_from ?? <span style={{ color: K.violation }}>要記入</span>}
                   {l.needs_confirm?.includes("valid_from") && <span style={{ color: K.violation }}> 要確認</span>}
-                </td>
-                <td className="text-center">{distText(l.distance)}</td>
-                <td><button className="underline" style={{ color: C.muted }} onClick={() => setEdit({ type: "level", obj: { ...l } })}>編集</button></td>
+                </Td>
+                <Td center>{distText(l.distance)}</Td>
+                <Td><button className="underline" style={{ color: C.muted }} onClick={() => setEdit({ type: "level", obj: { ...l } })}>編集</button></Td>
               </tr>
             ))}
           </tbody>
@@ -437,6 +443,57 @@ const TouchStrip = ({ s, refresh }) => {
   );
 };
 
+
+// ---------------------------------------------------------------- リプレイ (§9)
+const ReplayPane = () => {
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [floor, setFloor] = useState(true);
+  const [res, setRes] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const run = async () => {
+    setErr(null); setBusy(true);
+    const r = await jpost("/api/setup/replay", { from_local: from, to_local: to, floor_enabled: floor }, 60000);
+    setBusy(false);
+    if (!r) { setErr("リプレイできない (期間の形式 YYYY-MM-DD HH:MM、0<期間≤60日、Binance 到達性を確認)"); return; }
+    setRes(r);
+  };
+  const vc = { confirmed: K.fire, rejected_c: K.reject, silent: K.silent };
+  return (
+    <Panel title="リプレイ (台帳データ収集 · 先読み防止を強制)" right={res && <Small>{res.bars} 本 / {res.rows.length} 到達</Small>}>
+      <div className="flex flex-wrap gap-2 items-end">
+        <Field label="開始 (Europe/Paris)"><Input placeholder="2026-08-17 00:00" value={from} onChange={(e) => setFrom(e.target.value)} style={{ width: 170 }} /></Field>
+        <Field label="終了"><Input placeholder="2026-09-07 00:00" value={to} onChange={(e) => setTo(e.target.value)} style={{ width: 170 }} /></Field>
+        <label className="text-xs flex items-center gap-1 pb-2" style={{ color: C.muted }}><input type="checkbox" checked={floor} onChange={(e) => setFloor(e.target.checked)} />出来高床</label>
+        <Btn onClick={run} disabled={busy || !from || !to}>{busy ? "実行中…" : "リプレイ"}</Btn>
+      </div>
+      {err && <div className="text-xs mt-2" style={{ color: K.violation }}>{err}</div>}
+      {res && (
+        <>
+          <div className="mt-3 max-h-64 overflow-auto">
+            <table className="text-xs" style={{ fontFamily: FONT_MONO }}>
+              <thead><tr style={{ color: C.faint }}><Th left>id</Th><Th>到達</Th><Th>対象</Th><Th>側</Th><Th>判定</Th><Th>初点灯</Th><Th>受け入れ</Th><Th>本数</Th><Th left>+16本 終値</Th></tr></thead>
+              <tbody>
+                {res.rows.map((r) => (
+                  <tr key={r.id} style={{ borderTop: `1px solid ${C.borderSoft}` }}>
+                    <Td style={{ color: C.faint }}>{r.id}</Td><Td center>{r.ts_local}</Td><Td center style={{ fontWeight: 700 }}>{r.target_id}</Td><Td center>{r.side}</Td>
+                    <Td center style={{ color: vc[r.verdict] }}>{r.verdict}</Td><Td center style={{ color: K.fire }}>{r.first_fire_ts ?? "—"}</Td>
+                    <Td center style={{ color: K.accept }}>{r.accept_warning_ts ?? "—"}</Td><Td center>{r.bar_count}</Td>
+                    <Td style={{ color: C.muted }}>{r.path_16_close.map((x) => fmt(x, 0)).join(" ")}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="text-xs mt-2" style={{ color: C.faint }}>CSV (Google Sheet「POI水準台帳 v3」へ手動貼り付け。列順は Touch モデル順 — C表の列順は未回答)</div>
+          <textarea readOnly value={res.csv} rows={5} className="w-full mt-1" style={{ ...inputStyle, fontSize: 11 }} onFocus={(e) => e.target.select()} />
+        </>
+      )}
+    </Panel>
+  );
+};
+
 // ---------------------------------------------------------------- 画面
 export default function SetupConsole() {
   const [s, setS] = useState(null);
@@ -485,6 +542,9 @@ export default function SetupConsole() {
       </div>
       <div className="max-w-6xl mx-auto mt-4">
         <TouchStrip s={s} refresh={refresh} />
+      </div>
+      <div className="max-w-6xl mx-auto mt-4">
+        <ReplayPane />
       </div>
       <div className="max-w-6xl mx-auto mt-6 pb-4 text-xs leading-relaxed" style={{ color: C.faint, fontFamily: FONT_MONO }}>
         校正値 {s?.version ?? "—"} (config/confirm_{s?.version ?? "…"}.json · 上書き禁止) · δ方式 {s?.config?.delta_method ?? "—"} · 窓 {s?.config?.window_bars ?? "—"}本 · x_ratio {s?.config?.x_ratio ?? "—"} · atr_coef {s?.config?.atr_coef ?? "—"} · 床 ×{s?.config?.vol_floor_mult ?? "—"} / median {s?.config?.vol_median_len ?? "—"} · 受け入れ {s?.config?.accept_consecutive ?? "—"}本

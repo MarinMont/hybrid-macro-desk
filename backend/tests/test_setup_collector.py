@@ -187,3 +187,15 @@ def test_state_text_has_no_forbidden_words(env):
     body = env.get("/api/setup/state").text
     for w in ("シグナル", "エントリー推奨", "ロング推奨", "ショート推奨", "買い時", "売り時"):
         assert w not in body, w
+
+
+def test_replay_endpoint(env):
+    sc.init(FakeHTTP(touch_at=paris_to_ms("2026-09-07 15:00")), None, None)
+    r = env.post("/api/setup/replay", json={"from_local": "2026-09-07 00:00", "to_local": "2026-09-08 00:00"})
+    assert r.status_code == 200
+    j = r.json()
+    assert j["bars"] > 0 and j["csv"].splitlines()[0].startswith("id,ts_local")
+    l01 = [x for x in j["rows"] if x["target_id"] == "L01"]
+    assert l01 and l01[0]["ts_local"] == "2026-09-07 15:00" and len(l01[0]["path_16_close"]) == 16
+    assert env.post("/api/setup/replay", json={"from_local": "2026-09-08 00:00", "to_local": "2026-09-07 00:00"}).status_code == 400
+    assert env.post("/api/setup/replay", json={"from_local": "bad", "to_local": "2026-09-07 00:00"}).status_code == 400

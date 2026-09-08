@@ -77,6 +77,11 @@ Deribit満期の自前計算 / Anthropic API（AI概況・カレンダー注釈�
 - 台帳/フロー/履歴: `backend/data/*.json` (`SETUP_CONSOLE_DATA_DIR` で変更可)
 - 校正場面の実データ記録 (Mac で実行): `cd backend && python -m setup_console.record_calibration`
   → `backend/tests/fixtures/calibration/` に klines を保存し、床 median / taker Σδ / ATR / 終値の検証テストが有効になる
+- 画面: ダッシュボードのヘッダー「セットアップ ⇢」または `http://localhost:5173/#/setup`
+  ① 台帳＆帯 / ② 診断表 (Pine 同構成、形成中は「暫定」) / ③ 算術＋違反フラグ / ④ フロー＋「いまやること」
+  下段: カレンダーゲート 72h / 判定履歴 / 到達記録 (結果は人間が記入) / リプレイ (期間指定 → Touch 行 + CSV)
+- API: `GET /api/setup/state` (15s 毎に画面が読む集約) / `POST /api/setup/{inputs,arith,flow/advance,ledger/level,ledger/band,ledger/touch,calendar/event,calendar/holiday,replay}`
+- 各遷移は人間のチェック操作。自動は「価格が帯に到達」「約定後 4 窓で成立も棄却もなし → EXIT_PLAN」のみ
 
 ### 未回答事項 (仕様 §12: 推測で埋めない。回答があるまで該当水準は inactive)
 台帳の値:

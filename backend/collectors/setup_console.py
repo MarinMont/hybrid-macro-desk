@@ -22,12 +22,12 @@ from dataclasses import asdict
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from setup_console import atr as atrmod, calendar_gate as cg, flow as F, klines, ledger as LG
+from setup_console import atr as atrmod, calendar_gate as cg, flow as F, klines, ledger as LG, replay as RP
 from setup_console.arithmetic import ArithInput, EntryLeg, check as arith_check
 from setup_console.config import DEFAULT_VERSION, list_versions, load_config
 from setup_console.confirm import ACCEPT_TEXT, WindowBar, diagnosis_rows, evaluate_series, judge
 from setup_console.store import data_path, read_json, write_json_atomic
-from setup_console.tz import bar_labels, paris_date, paris_label
+from setup_console.tz import bar_labels, paris_date, paris_label, paris_to_ms
 
 log = logging.getLogger("liqmap.setup")
 router = APIRouter()
@@ -83,6 +83,26 @@ async def _fetch(interval: str, limit: int) -> list[klines.Bar]:
     r = await http.get(f"{FAPI}/fapi/v1/klines", params={"symbol": SYMBOL, "interval": interval, "limit": limit}, timeout=10.0)
     r.raise_for_status()
     return klines.parse_klines(r.json())
+
+
+async def _fetch_range(interval: str, start_ms: int, end_ms: int, limit: int = 1500) -> list[klines.Bar]:
+    """範囲指定の klines (ページング)。リプレイ用。"""
+    http = _deps["http"]
+    out: dict[int, klines.Bar] = {}
+    cur = start_ms
+    while cur < end_ms:
+        r = await http.get(f"{FAPI}/fapi/v1/klines",
+                           params={"symbol": SYMBOL, "interval": interval, "startTime": cur, "endTime": end_ms, "limit": limit}, timeout=20.0)
+        r.raise_for_status()
+        chunk = klines.parse_klines(r.json())
+        if not chunk:
+            break
+        for b in chunk:
+            out[b.t] = b
+        if len(chunk) < limit:
+            break
+        cur = chunk[-1].t + 1
+    return [out[t] for t in sorted(out)]
 
 
 async def _loop_15m():
@@ -506,3 +526,32 @@ async def add_holiday(body: HolidayBody):
         cal["holidays"].sort(key=lambda h: h["date"])
         cg.save_calendar(cal)
     return {"ok": True, "holidays": cal["holidays"]}
+
+
+# ---------------- リプレイ (SPEC §9) ----------------
+class ReplayBody(BaseModel):
+    from_local: str      # "YYYY-MM-DD HH:MM" (Europe/Paris)
+    to_local: str
+    floor_enabled: bool = True
+
+
+@router.post("/api/setup/replay")
+async def replay_endpoint(body: ReplayBody):
+    try:
+        from_ms, to_ms = paris_to_ms(body.from_local), paris_to_ms(body.to_local)
+    except ValueError:
+        raise HTTPException(400, "日時は YYYY-MM-DD HH:MM (Europe/Paris)")
+    if to_ms <= from_ms or (to_ms - from_ms) > 60 * 86_400_000:
+        raise HTTPException(400, "範囲は 0 < 期間 ≤ 60 日")
+    cfg = _cfg()
+    warm = max(cfg.vol_median_len, 400) * 900_000   # ATR 収束 + 床 median の履歴
+    try:
+        bars = await _fetch_range("15m", from_ms - warm, to_ms + (RP.PATH_BARS + 1) * 900_000)
+        bars1 = await _fetch_range("1m", from_ms, to_ms + 900_000) if cfg.delta_method == "reconstruct" else []
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(503, f"klines 取得失敗: {e}")
+    now_ms = int(time.time() * 1000)
+    bars = klines.only_closed(bars, now_ms, 900_000)
+    lg = LG.load_ledger()
+    rows = RP.replay(bars, cfg, lg, from_ms, to_ms, bars1, body.floor_enabled)
+    return {"from_local": body.from_local, "to_local": body.to_local, "bars": len(bars), "rows": rows, "csv": RP.to_csv(rows)}
